@@ -81,6 +81,7 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { IntentRegistry } from './intent/IntentRegistry.js';
 
 /* spinning up express */
 export const app = express();
@@ -121,6 +122,145 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  log.info('initialise intent registry');
+
+  const intentRegistry = new IntentRegistry();
+
+  intentRegistry.registerBatch([
+    {
+      patterns: ['list cards', 'get cards', 'show cards', 'fetch cards'],
+      handler: CardController.list,
+      method: 'GET',
+      route: '/api/cards',
+      description: 'Retrieve a list of cards',
+      tags: ['card', 'read'],
+    },
+    {
+      patterns: ['create card', 'add card', 'new card', 'make card'],
+      handler: CardController.create,
+      method: 'POST',
+      route: '/api/cards',
+      description: 'Create a new card',
+      tags: ['card', 'write'],
+    },
+    {
+      patterns: ['get card', 'show card', 'fetch card', 'retrieve card'],
+      handler: CardController.get,
+      method: 'GET',
+      route: '/api/cards/:id',
+      description: 'Retrieve a specific card by ID',
+      tags: ['card', 'read'],
+    },
+    {
+      patterns: ['update card', 'modify card', 'edit card', 'change card'],
+      handler: CardController.update,
+      method: 'POST',
+      route: '/api/cards/:id',
+      description: 'Update an existing card',
+      tags: ['card', 'write'],
+    },
+    {
+      patterns: ['list accounts', 'get accounts', 'show accounts', 'fetch accounts'],
+      handler: AccountController.list,
+      method: 'GET',
+      route: '/api/accounts',
+      description: 'Retrieve a list of accounts',
+      tags: ['account', 'read'],
+    },
+    {
+      patterns: ['create account', 'add account', 'new account', 'make account'],
+      handler: AccountController.create,
+      method: 'POST',
+      route: '/api/accounts',
+      description: 'Create a new account',
+      tags: ['account', 'write'],
+    },
+    {
+      patterns: ['get account', 'show account', 'fetch account', 'retrieve account'],
+      handler: AccountController.fetch,
+      method: 'GET',
+      route: '/api/accounts/:id',
+      description: 'Retrieve a specific account by ID',
+      tags: ['account', 'read'],
+    },
+    {
+      patterns: ['update account', 'modify account', 'edit account', 'change account'],
+      handler: AccountController.update,
+      method: 'POST',
+      route: '/api/accounts/:id',
+      description: 'Update an existing account',
+      tags: ['account', 'write'],
+    },
+    {
+      patterns: ['list lanes', 'get lanes', 'show lanes', 'fetch lanes'],
+      handler: LaneController.list,
+      method: 'GET',
+      route: '/api/lanes',
+      description: 'Retrieve a list of lanes',
+      tags: ['lane', 'read'],
+    },
+    {
+      patterns: ['update lanes', 'modify lanes', 'edit lanes', 'change lanes'],
+      handler: LaneController.updateAll,
+      method: 'POST',
+      route: '/api/lanes',
+      description: 'Update multiple lanes',
+      tags: ['lane', 'write'],
+    },
+    {
+      patterns: ['update lane', 'modify lane', 'edit lane', 'change lane'],
+      handler: LaneController.update,
+      method: 'POST',
+      route: '/api/lanes/:id',
+      description: 'Update a specific lane',
+      tags: ['lane', 'write'],
+    },
+    {
+      patterns: ['list users', 'get users', 'show users', 'fetch users'],
+      handler: UserController.list,
+      method: 'GET',
+      route: '/api/users',
+      description: 'Retrieve a list of users',
+      tags: ['user', 'read'],
+    },
+    {
+      patterns: ['create user', 'add user', 'new user', 'make user'],
+      handler: UserController.create,
+      method: 'POST',
+      route: '/api/users',
+      description: 'Create a new user',
+      tags: ['user', 'write'],
+    },
+    {
+      patterns: ['update user', 'modify user', 'edit user', 'change user'],
+      handler: UserController.update,
+      method: 'POST',
+      route: '/api/users/:id',
+      description: 'Update an existing user',
+      tags: ['user', 'write'],
+    },
+    {
+      patterns: ['login', 'sign in', 'authenticate', 'log in'],
+      handler: LoginController.handle,
+      method: 'POST',
+      route: '/public/login',
+      description: 'Authenticate a user',
+      tags: ['auth', 'public'],
+    },
+    {
+      patterns: ['register', 'sign up', 'create account', 'join'],
+      handler: RegisterController.register,
+      method: 'POST',
+      route: '/public/register',
+      description: 'Register a new user',
+      tags: ['auth', 'public'],
+    },
+  ]);
+
+  log.info(`intent registry initialized with ${intentRegistry.getPatternCount()} patterns`);
+
+  app.locals.intentRegistry = intentRegistry;
 
   const card = express.Router();
 
