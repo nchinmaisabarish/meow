@@ -81,6 +81,9 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { IntentRegistry } from './intent/IntentRegistry.js';
+
+export const intentRegistry = new IntentRegistry();
 
 /* spinning up express */
 export const app = express();
@@ -121,6 +124,91 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  log.info('initialising intent registry');
+
+  intentRegistry.register('list_cards', 'CardController', 'list', CardController.list);
+  intentRegistry.register('create_card', 'CardController', 'create', CardController.create);
+  intentRegistry.register('get_card', 'CardController', 'get', CardController.get);
+  intentRegistry.register('update_card', 'CardController', 'update', CardController.update);
+
+  intentRegistry.register('list_accounts', 'AccountController', 'list', AccountController.list);
+  intentRegistry.register('create_account', 'AccountController', 'create', AccountController.create);
+  intentRegistry.register('get_account', 'AccountController', 'fetch', AccountController.fetch);
+  intentRegistry.register('update_account', 'AccountController', 'update', AccountController.update);
+
+  intentRegistry.register('list_lanes', 'LaneController', 'list', LaneController.list);
+  intentRegistry.register('update_lane', 'LaneController', 'update', LaneController.update);
+  intentRegistry.register('update_all_lanes', 'LaneController', 'updateAll', LaneController.updateAll);
+
+  intentRegistry.register('list_users', 'UserController', 'list', UserController.list);
+  intentRegistry.register('create_user', 'UserController', 'create', UserController.create);
+  intentRegistry.register('update_user', 'UserController', 'update', UserController.update);
+
+  intentRegistry.register('get_team', 'TeamController', 'get', TeamController.get);
+  intentRegistry.register('update_team', 'TeamController', 'update', TeamController.update);
+
+  intentRegistry.register('list_schemas', 'SchemaController', 'list', SchemaController.list);
+  intentRegistry.register('create_schema', 'SchemaController', 'create', SchemaController.create);
+
+  intentRegistry.register('list_activities', 'ActivityController', 'list', ActivityController.list);
+
+  intentRegistry.register('forecast_achieved', 'ForecastController', 'achieved', ForecastController.achieved);
+  intentRegistry.register('forecast_predicted', 'ForecastController', 'predicted', ForecastController.predicted);
+  intentRegistry.register('forecast_list', 'ForecastController', 'list', ForecastController.list);
+  intentRegistry.register('forecast_series', 'ForecastController', 'series', ForecastController.series);
+  intentRegistry.register('forecast_generated', 'ForecastController', 'generated', ForecastController.generated);
+
+  intentRegistry.registerPattern({
+    pattern: /list (all )?cards?/i,
+    action: 'list_cards',
+    controller: 'CardController',
+    method: 'list',
+  });
+
+  intentRegistry.registerPattern({
+    pattern: /create (a |new )?card/i,
+    action: 'create_card',
+    controller: 'CardController',
+    method: 'create',
+  });
+
+  intentRegistry.registerPattern({
+    pattern: /list (all )?accounts?/i,
+    action: 'list_accounts',
+    controller: 'AccountController',
+    method: 'list',
+  });
+
+  intentRegistry.registerPattern({
+    pattern: /create (a |new )?account/i,
+    action: 'create_account',
+    controller: 'AccountController',
+    method: 'create',
+  });
+
+  intentRegistry.registerPattern({
+    pattern: /list (all )?lanes?/i,
+    action: 'list_lanes',
+    controller: 'LaneController',
+    method: 'list',
+  });
+
+  intentRegistry.registerPattern({
+    pattern: /list (all )?users?/i,
+    action: 'list_users',
+    controller: 'UserController',
+    method: 'list',
+  });
+
+  intentRegistry.registerPattern({
+    pattern: /show (me )?(the )?forecast/i,
+    action: 'forecast_list',
+    controller: 'ForecastController',
+    method: 'list',
+  });
+
+  log.info('intent registry initialised with patterns and mappings');
 
   const card = express.Router();
 
