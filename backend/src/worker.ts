@@ -81,6 +81,9 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { ToolRegistry } from './tools/ToolRegistry.js';
+import { GetAccountTool } from './tools/account/GetAccountTool.js';
+import { ListAccountsTool } from './tools/account/ListAccountsTool.js';
 
 /* spinning up express */
 export const app = express();
@@ -121,6 +124,19 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  log.info('initializing tool registry');
+
+  const toolRegistry = ToolRegistry.getInstance();
+
+  const getAccountTool = new GetAccountTool();
+  const listAccountsTool = new ListAccountsTool();
+
+  toolRegistry.register(getAccountTool);
+  toolRegistry.register(listAccountsTool);
+
+  log.info(`registered ${toolRegistry.getAll().length} tools`);
+  log.info('tool schemas:', toolRegistry.getAllSchemas());
 
   const card = express.Router();
 
