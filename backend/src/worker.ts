@@ -81,6 +81,7 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { IntentController } from './controllers/IntentController.js';
 
 /* spinning up express */
 export const app = express();
@@ -121,6 +122,16 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  const intent = express.Router();
+
+  intent.use(express.json({ limit: '5kb' }));
+  intent.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  intent.route('/resolve').post(rejectIfContentTypeIsNot('application/json'), IntentController.resolve);
+  intent.route('/list').get(IntentController.listIntents);
+
+  app.use('/api/intent', intent);
 
   const card = express.Router();
 
