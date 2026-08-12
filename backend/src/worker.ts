@@ -81,6 +81,7 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { IntentRegistry } from './intent/IntentRegistry.js';
 
 /* spinning up express */
 export const app = express();
@@ -104,12 +105,18 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(cors(corsOptions));
 
+export let intentRegistry: IntentRegistry;
+
 try {
   log.info('initialise database connection');
 
   await DatabaseHelper.connect(process.env.MONGODB_URI!);
 
   log.info('database connection established');
+
+  log.info('initialising intent registry');
+  intentRegistry = new IntentRegistry();
+  log.info('intent registry initialised');
 
   const strategy = new NodeEventStrategy();
 
