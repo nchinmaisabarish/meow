@@ -1,0 +1,250 @@
+{
+  "name": "Card Lifecycle Workflow",
+  "description": "Manages the lifecycle of cards from creation to completion or archival",
+  "initialState": "CREATED",
+  "states": [
+    {
+      "id": "CREATED",
+      "name": "Created",
+      "metadata": {
+        "description": "Card has been created but not yet assigned or started",
+        "color": "#gray"
+      }
+    },
+    {
+      "id": "IN_PROGRESS",
+      "name": "In Progress",
+      "metadata": {
+        "description": "Card is actively being worked on",
+        "color": "#blue"
+      }
+    },
+    {
+      "id": "BLOCKED",
+      "name": "Blocked",
+      "metadata": {
+        "description": "Card is blocked and cannot proceed",
+        "color": "#red"
+      }
+    },
+    {
+      "id": "COMPLETED",
+      "name": "Completed",
+      "metadata": {
+        "description": "Card work is completed",
+        "color": "#green"
+      }
+    },
+    {
+      "id": "ARCHIVED",
+      "name": "Archived",
+      "metadata": {
+        "description": "Card is archived and no longer active",
+        "color": "#gray"
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "id": "created_to_in_progress",
+      "from": "CREATED",
+      "to": "IN_PROGRESS",
+      "event": "ASSIGNED",
+      "condition": {
+        "type": "is_assigned"
+      },
+      "action": {
+        "type": "set_in_lane_since"
+      }
+    },
+    {
+      "id": "created_to_in_progress_on_move",
+      "from": "CREATED",
+      "to": "IN_PROGRESS",
+      "event": "MOVED_TO_LANE",
+      "condition": {
+        "type": "is_assigned"
+      },
+      "action": {
+        "type": "set_in_lane_since"
+      }
+    },
+    {
+      "id": "in_progress_to_blocked",
+      "from": "IN_PROGRESS",
+      "to": "BLOCKED",
+      "event": "BLOCKED",
+      "condition": {
+        "type": "has_blocker_attribute"
+      },
+      "action": {
+        "type": "log_transition"
+      }
+    },
+    {
+      "id": "in_progress_to_blocked_on_update",
+      "from": "IN_PROGRESS",
+      "to": "BLOCKED",
+      "event": "UPDATED",
+      "condition": {
+        "type": "has_blocker_attribute"
+      },
+      "action": {
+        "type": "log_transition"
+      }
+    },
+    {
+      "id": "blocked_to_in_progress",
+      "from": "BLOCKED",
+      "to": "IN_PROGRESS",
+      "event": "UNBLOCKED",
+      "condition": {
+        "type": "no_blocker_attribute"
+      },
+      "action": {
+        "type": "log_transition"
+      }
+    },
+    {
+      "id": "blocked_to_in_progress_on_update",
+      "from": "BLOCKED",
+      "to": "IN_PROGRESS",
+      "event": "UPDATED",
+      "condition": {
+        "type": "no_blocker_attribute"
+      },
+      "action": {
+        "type": "log_transition"
+      }
+    },
+    {
+      "id": "in_progress_to_completed",
+      "from": "IN_PROGRESS",
+      "to": "COMPLETED",
+      "event": "COMPLETED",
+      "condition": {
+        "type": "is_closed"
+      },
+      "action": {
+        "type": "set_closed_at"
+      }
+    },
+    {
+      "id": "in_progress_to_completed_on_move",
+      "from": "IN_PROGRESS",
+      "to": "COMPLETED",
+      "event": "MOVED_TO_LANE",
+      "condition": {
+        "type": "lane_type_is_completed"
+      },
+      "action": {
+        "type": "set_closed_at"
+      }
+    },
+    {
+      "id": "blocked_to_completed",
+      "from": "BLOCKED",
+      "to": "COMPLETED",
+      "event": "COMPLETED",
+      "condition": {
+        "type": "is_closed"
+      },
+      "action": {
+        "type": "set_closed_at"
+      }
+    },
+    {
+      "id": "blocked_to_completed_on_move",
+      "from": "BLOCKED",
+      "to": "COMPLETED",
+      "event": "MOVED_TO_LANE",
+      "condition": {
+        "type": "lane_type_is_completed"
+      },
+      "action": {
+        "type": "set_closed_at"
+      }
+    },
+    {
+      "id": "created_to_completed",
+      "from": "CREATED",
+      "to": "COMPLETED",
+      "event": "MOVED_TO_LANE",
+      "condition": {
+        "type": "lane_type_is_completed"
+      },
+      "action": {
+        "type": "set_closed_at"
+      }
+    },
+    {
+      "id": "completed_to_archived",
+      "from": "COMPLETED",
+      "to": "ARCHIVED",
+      "event": "ARCHIVED",
+      "action": {
+        "type": "log_transition"
+      }
+    },
+    {
+      "id": "completed_to_archived_on_move",
+      "from": "COMPLETED",
+      "to": "ARCHIVED",
+      "event": "MOVED_TO_LANE",
+      "condition": {
+        "type": "lane_type_is_archived"
+      },
+      "action": {
+        "type": "log_transition"
+      }
+    },
+    {
+      "id": "in_progress_to_archived",
+      "from": "IN_PROGRESS",
+      "to": "ARCHIVED",
+      "event": "MOVED_TO_LANE",
+      "condition": {
+        "type": "lane_type_is_archived"
+      },
+      "action": {
+        "type": "log_transition"
+      }
+    },
+    {
+      "id": "blocked_to_archived",
+      "from": "BLOCKED",
+      "to": "ARCHIVED",
+      "event": "MOVED_TO_LANE",
+      "condition": {
+        "type": "lane_type_is_archived"
+      },
+      "action": {
+        "type": "log_transition"
+      }
+    },
+    {
+      "id": "created_to_archived",
+      "from": "CREATED",
+      "to": "ARCHIVED",
+      "event": "MOVED_TO_LANE",
+      "condition": {
+        "type": "lane_type_is_archived"
+      },
+      "action": {
+        "type": "log_transition"
+      }
+    },
+    {
+      "id": "completed_to_in_progress",
+      "from": "COMPLETED",
+      "to": "IN_PROGRESS",
+      "event": "MOVED_TO_LANE",
+      "condition": {
+        "type": "is_assigned"
+      },
+      "action": {
+        "type": "clear_closed_at"
+      }
+    }
+  ]
+}

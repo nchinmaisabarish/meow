@@ -14,6 +14,11 @@ import {
   validateAndFetchLane,
   validateAndFetchUser,
 } from '../helpers/EntityFetchHelper.js';
+import {
+  cardLifecycleWorkflow,
+  CardEventType,
+  CardWorkflowContext,
+} from '../workflows/CardLifecycleWorkflow.js';
 
 const extractDateLimitFromRequest = (req: AuthenticatedRequest): DateTime | undefined => {
   const maxDaysAgo = req.query['max-days-ago']
@@ -112,6 +117,16 @@ const create = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
 
     const latest = await EntityHelper.create(card, Card);
 
+    const workflowContext: CardWorkflowContext = {
+      card: latest!,
+      lane,
+      user: req.jwt.user,
+      eventType: CardEventType.CREATED,
+      currentState: 'CREATED',
+    };
+
+    await cardLifecycleWorkflow.executeTransition(workflowContext);
+
     emitCardEvent(req.jwt.user, latest!.toPlain());
     emitLaneEvent(card.laneId, card.userId);
     emitBoardEvent(lane.boardId, card.userId);
@@ -143,6 +158,7 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
     card.name = body.name;
 
     let previousUserId = undefined;
+    let userChanged = false;
 
     if (body.userId && card.userId.toString() !== body.userId.toString()) {
       const user = await validateAndFetchUser(body.userId, req.jwt.user);
@@ -150,6 +166,7 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
       previousUserId = card.userId;
 
       card.userId = user._id!;
+      userChanged = true;
     }
 
     if (body.attributes) {
@@ -184,14 +201,17 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
     }
 
     let previousLaneId: ObjectId | undefined = undefined;
+    let laneChanged = false;
+    let lane: Lane | null = null;
 
     if (body.laneId) {
-      const lane = await validateAndFetchLane(body.laneId, req.jwt.user);
+      lane = await validateAndFetchLane(body.laneId, req.jwt.user);
 
       if (body.laneId.toString() !== card.laneId.toString()) {
         previousLaneId = card.laneId;
 
         card.inLaneSince = new Date();
+        laneChanged = true;
       }
 
       card.laneId = lane._id!;
@@ -201,26 +221,47 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
 
         card.closedAt = closedAt.toJSDate();
       }
+    } else {
+      lane = await EntityHelper.findOneById(Lane, card.laneId);
     }
 
     const latest = await EntityHelper.update(card);
 
-    /* emit events */
+    let eventType = CardEventType.UPDATED;
+    if (laneChanged) {
+      eventType = CardEventType.MOVED_TO_LANE;
+    } else if (userChanged) {
+      eventType = CardEventType.ASSIGNED;
+    } else if (body.attributes?.blocked === true && previous.attributes?.blocked !== true) {
+      eventType = CardEventType.BLOCKED;
+    } else if (body.attributes?.blocked !== true && previous.attributes?.blocked === true) {
+      eventType = CardEventType.UNBLOCKED;
+    } else if (card.closedAt && !previous.closedAt) {
+      eventType = CardEventType.COMPLETED;
+    } else if (card.status === CardStatus.Deleted) {
+      eventType = CardEventType.ARCHIVED;
+    }
 
-    /* if lane has hanged emit events for the previous and current lane */
+    const workflowContext: CardWorkflowContext = {
+      card: latest,
+      previousCard: previous,
+      lane: lane!,
+      user: req.jwt.user,
+      eventType,
+      currentState: 'CREATED',
+    };
+
+    await cardLifecycleWorkflow.executeTransition(workflowContext);
+
     if (previousLaneId) {
       emitLaneEvent(previousLaneId, card.userId);
       emitLaneEvent(card.laneId, card.userId);
     }
 
-    /* if card has a changed amount update the lane and user */
     if (previousAmount) {
       emitLaneEvent(card.laneId, card.userId);
     }
 
-    const lane = await EntityHelper.findOneById(Lane, card.laneId);
-
-    /* if card assignment has changed update lane and both users */
     if (previousUserId) {
       emitLaneEvent(card.laneId, previousUserId);
       emitLaneEvent(card.laneId, card.userId);
