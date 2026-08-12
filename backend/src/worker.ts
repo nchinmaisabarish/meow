@@ -81,6 +81,9 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { IntentRegistry } from './intent/IntentRegistry.js';
+
+export const intentRegistry = new IntentRegistry();
 
 /* spinning up express */
 export const app = express();
@@ -110,6 +113,10 @@ try {
   await DatabaseHelper.connect(process.env.MONGODB_URI!);
 
   log.info('database connection established');
+
+  log.info('initialise intent registry');
+
+  log.info('intent registry initialized');
 
   const strategy = new NodeEventStrategy();
 
