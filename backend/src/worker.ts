@@ -1,4 +1,6 @@
-// @ts-ignore
+import { SERVICE_NAME } from './Constants.js';
+import pino from 'pino';
+
 export const log = pino({
   name: SERVICE_NAME,
   level: process.env.LOG_LEVEL || 'info',
@@ -71,8 +73,6 @@ import { NodeEventStrategy } from './events/NodeEventStrategy.js';
 import { LaneEventListener } from './events/LaneEventListener.js';
 import { CardEventListener } from './events/CardEventListener.js';
 import { AccountEventListener } from './events/AccountEventListener.js';
-import { SERVICE_NAME } from './Constants.js';
-import pino from 'pino';
 import { CardReferenceListener } from './events/CardReferenceListener.js';
 import { CardEventController } from './controllers/CardEventController.js';
 import { AccountEventController } from './controllers/AccountEventController.js';
@@ -81,8 +81,9 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { intentDispatcherMiddleware } from './middleware/IntentDispatcherMiddleware.js';
+import { ENABLE_INTENT_BASED_ROUTING } from './Constants.js';
 
-/* spinning up express */
 export const app = express();
 
 app.set('port', process.env.PORT || 9000);
@@ -97,12 +98,18 @@ let corsOptions: cors.CorsOptions = {
   methods: ['GET', 'POST', 'DELETE'],
 };
 
-/* enable CORS in production mode */
 if (process.env.NODE_ENV === 'production') {
   corsOptions.origin = false;
 }
 
 app.use(cors(corsOptions));
+
+if (ENABLE_INTENT_BASED_ROUTING) {
+  log.info('Intent-based routing is ENABLED');
+  app.use(intentDispatcherMiddleware);
+} else {
+  log.info('Intent-based routing is DISABLED');
+}
 
 try {
   log.info('initialise database connection');
@@ -365,7 +372,6 @@ try {
   log.error(error);
 }
 
-/* return 404 for all other /api routes */
 app.all('/api/*', (req, res) => {
   res.status(404).end();
 });

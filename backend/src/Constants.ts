@@ -130,3 +130,5 @@ export const RESERVED_ATTRIBUTES = [
 ];
 
 export const RESERVED_USERS = ['id', 'all'];
+
+export const ENABLE_INTENT_BASED_ROUTING = process.env.ENABLE_INTENT_ROUTING === 'true' || false;
