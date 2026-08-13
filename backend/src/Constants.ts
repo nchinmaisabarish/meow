@@ -130,3 +130,45 @@ export const RESERVED_ATTRIBUTES = [
 ];
 
 export const RESERVED_USERS = ['id', 'all'];
+
+export const WORKFLOW_DEFAULT_VERSION = '1.0.0';
+
+export const WORKFLOW_STATE_TYPES = {
+  INITIAL: 'initial',
+  INTERMEDIATE: 'intermediate',
+  FINAL: 'final',
+} as const;
+
+export const WORKFLOW_DEFAULT_NAMES = {
+  OPPORTUNITY_WORKFLOW: 'opportunity-workflow',
+  ACCOUNT_WORKFLOW: 'account-workflow',
+  TASK_WORKFLOW: 'task-workflow',
+} as const;
+
+export const WORKFLOW_STATE_IDS = {
+  DRAFT: 'draft',
+  IN_PROGRESS: 'in-progress',
+  REVIEW: 'review',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+} as const;
+
+export const WORKFLOW_EVENTS = {
+  START: 'start',
+  SUBMIT: 'submit',
+  APPROVE: 'approve',
+  REJECT: 'reject',
+  COMPLETE: 'complete',
+  CANCEL: 'cancel',
+  RESUME: 'resume',
+} as const;
+
+export const WORKFLOW_VALIDATION_RULES = {
+  MAX_STATES: 100,
+  MAX_TRANSITIONS: 500,
+  MAX_NAME_LENGTH: 100,
+  MAX_DESCRIPTION_LENGTH: 500,
+  MIN_VERSION_PARTS: 3,
+} as const;
