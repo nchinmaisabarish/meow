@@ -81,6 +81,7 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { intentParsingMiddleware } from './middleware/IntentParsingMiddleware.js';
 
 /* spinning up express */
 export const app = express();
@@ -125,6 +126,7 @@ try {
   const card = express.Router();
 
   card.use(express.json({ limit: '5kb' }));
+  card.use(intentParsingMiddleware);
   card.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
 
   card.route('/').get(CardController.list);
@@ -157,6 +159,7 @@ try {
   const team = express.Router();
 
   team.use(express.json({ limit: '5kb' }));
+  team.use(intentParsingMiddleware);
 
   team.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
 
@@ -180,6 +183,7 @@ try {
   const account = express.Router();
 
   account.use(express.json({ limit: '5kb' }));
+  account.use(intentParsingMiddleware);
 
   account.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
 
@@ -213,6 +217,7 @@ try {
   const lane = express.Router();
 
   lane.use(express.json({ limit: '5kb' }));
+  lane.use(intentParsingMiddleware);
 
   lane.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
 
@@ -238,6 +243,7 @@ try {
   const user = express.Router();
 
   user.use(express.json({ limit: '5kb' }));
+  user.use(intentParsingMiddleware);
 
   user.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
 
@@ -277,6 +283,7 @@ try {
   const forecast = express.Router();
 
   forecast.use(express.json({ limit: '5kb' }));
+  forecast.use(intentParsingMiddleware);
 
   forecast.use(
     verifyJwt,
@@ -297,6 +304,7 @@ try {
   const schema = express.Router();
 
   schema.use(express.json({ limit: '5kb' }));
+  schema.use(intentParsingMiddleware);
 
   schema.use(verifyJwt);
   schema.use(addEntityToHeader);
@@ -317,6 +325,7 @@ try {
   const activity = express.Router();
 
   activity.use(express.json({ limit: '5kb' }));
+  activity.use(intentParsingMiddleware);
 
   activity.use(
     verifyJwt,
@@ -333,6 +342,7 @@ try {
   const unprotected = express.Router();
 
   unprotected.use(express.json({ limit: '1kb' }));
+  unprotected.use(intentParsingMiddleware);
   unprotected.use(setHeaders);
   unprotected.use(isDatabaseConnectionEstablished);
 
