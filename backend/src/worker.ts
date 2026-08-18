@@ -81,6 +81,8 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { intentMappings } from './intent/IntentMappings.js';
+import { IntentRegistry } from './intent/IntentRegistry.js';
 
 /* spinning up express */
 export const app = express();
@@ -104,6 +106,48 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(cors(corsOptions));
 
+const controllerMap: Record<string, any> = {
+  UserController,
+  AccountController,
+  CardController,
+  LaneController,
+  LaneStatisticsController,
+  TeamController,
+  ForecastController,
+  SchemaController,
+  ActivityController,
+  CardEventController,
+  AccountEventController,
+};
+
+function validateIntentMappings(): void {
+  log.info('Validating intent mappings...');
+  
+  const errors: string[] = [];
+  
+  for (const mapping of intentMappings) {
+    const controller = controllerMap[mapping.controller];
+    
+    if (!controller) {
+      errors.push(`Controller '${mapping.controller}' not found for intent '${mapping.intent}'`);
+      continue;
+    }
+    
+    if (typeof controller[mapping.method] !== 'function') {
+      errors.push(
+        `Method '${mapping.method}' not found in controller '${mapping.controller}' for intent '${mapping.intent}'`
+      );
+    }
+  }
+  
+  if (errors.length > 0) {
+    log.error({ errors }, 'Intent mapping validation failed');
+    throw new Error(`Intent mapping validation failed: ${errors.join(', ')}`);
+  }
+  
+  log.info(`Successfully validated ${intentMappings.length} intent mappings`);
+}
+
 try {
   log.info('initialise database connection');
 
@@ -121,6 +165,21 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  validateIntentMappings();
+  
+  log.info('Registering intent mappings with IntentRegistry...');
+  
+  for (const mapping of intentMappings) {
+    IntentRegistry.register(
+      mapping.intent,
+      mapping.controller,
+      mapping.method,
+      mapping.requiredParams
+    );
+  }
+  
+  log.info(`Registered ${intentMappings.length} intent mappings successfully`);
 
   const card = express.Router();
 
