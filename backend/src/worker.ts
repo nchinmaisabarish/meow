@@ -81,6 +81,8 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { ToolRegistry } from './tools/ToolRegistry.js';
+import { accountTools } from './tools/AccountTools.js';
 
 /* spinning up express */
 export const app = express();
@@ -121,6 +123,29 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  const toolRegistry = new ToolRegistry();
+  accountTools.forEach((tool) => toolRegistry.register(tool));
+
+  const tools = express.Router();
+
+  tools.use(express.json({ limit: '5kb' }));
+  tools.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  tools.route('/').get((req, res) => {
+    try {
+      const schemas = toolRegistry.getSchemas();
+      res.status(200).json({
+        tools: schemas,
+        count: schemas.length,
+      });
+    } catch (error) {
+      log.error(error);
+      res.status(500).json({ error: 'Failed to retrieve tool schemas' });
+    }
+  });
+
+  app.use('/api/tools', tools);
 
   const card = express.Router();
 
