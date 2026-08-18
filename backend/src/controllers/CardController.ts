@@ -14,6 +14,7 @@ import {
   validateAndFetchLane,
   validateAndFetchUser,
 } from '../helpers/EntityFetchHelper.js';
+import { cardLifecycleWorkflow } from '../workflow/CardLifecycleWorkflow.js';
 
 const extractDateLimitFromRequest = (req: AuthenticatedRequest): DateTime | undefined => {
   const maxDaysAgo = req.query['max-days-ago']
@@ -184,11 +185,24 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
     }
 
     let previousLaneId: ObjectId | undefined = undefined;
+    let workflowValidationResult: any = null;
 
     if (body.laneId) {
       const lane = await validateAndFetchLane(body.laneId, req.jwt.user);
 
       if (body.laneId.toString() !== card.laneId.toString()) {
+        workflowValidationResult = await cardLifecycleWorkflow.validateTransition(
+          card,
+          lane,
+          req.jwt.user
+        );
+
+        if (!workflowValidationResult.valid) {
+          throw new InvalidCardPropertyError(
+            workflowValidationResult.reason || 'Invalid workflow transition'
+          );
+        }
+
         previousLaneId = card.laneId;
 
         card.inLaneSince = new Date();
@@ -205,22 +219,17 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
 
     const latest = await EntityHelper.update(card);
 
-    /* emit events */
-
-    /* if lane has hanged emit events for the previous and current lane */
     if (previousLaneId) {
       emitLaneEvent(previousLaneId, card.userId);
       emitLaneEvent(card.laneId, card.userId);
     }
 
-    /* if card has a changed amount update the lane and user */
     if (previousAmount) {
       emitLaneEvent(card.laneId, card.userId);
     }
 
     const lane = await EntityHelper.findOneById(Lane, card.laneId);
 
-    /* if card assignment has changed update lane and both users */
     if (previousUserId) {
       emitLaneEvent(card.laneId, previousUserId);
       emitLaneEvent(card.laneId, card.userId);
@@ -228,7 +237,15 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
       emitBoardEvent(lane!.boardId, previousUserId);
     }
 
-    emitCardEvent(req.jwt.user, latest.toPlain(), previous);
+    const cardEventData = latest.toPlain();
+    if (workflowValidationResult) {
+      (cardEventData as any).workflowTransition = {
+        from: workflowValidationResult.fromState,
+        to: workflowValidationResult.toState,
+      };
+    }
+
+    emitCardEvent(req.jwt.user, cardEventData, previous);
     emitBoardEvent(lane!.boardId, card.userId);
 
     return res.json(latest);

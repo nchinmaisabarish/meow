@@ -6,6 +6,7 @@ import { AuthenticatedRequest } from '../requests/AuthenticatedRequest.js';
 import { ObjectId, Sort } from 'mongodb';
 import { CardEvent, NewCardEvent } from '../entities/CardEvent.js';
 import { validateAndFetchCard } from '../helpers/EntityFetchHelper.js';
+import { cardLifecycleWorkflow } from '../workflow/CardLifecycleWorkflow.js';
 
 const list = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -48,7 +49,58 @@ const create = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
   }
 };
 
+const logWorkflowStateChange = async (
+  cardId: ObjectId,
+  userId: ObjectId,
+  teamId: ObjectId,
+  fromState: string,
+  toState: string,
+  metadata?: Record<string, any>
+): Promise<CardEvent | null> => {
+  try {
+    const card = await EntityHelper.findOneById(
+      { collection: 'cards' } as any,
+      cardId
+    );
+
+    if (!card) {
+      return null;
+    }
+
+    const user = await EntityHelper.findOneById(
+      { collection: 'users' } as any,
+      userId
+    );
+
+    if (!user) {
+      return null;
+    }
+
+    const eventData = {
+      fromState,
+      toState,
+      transitionedAt: new Date(),
+      ...metadata,
+    };
+
+    const newEvent = new NewCardEvent(
+      card as any,
+      user as any,
+      EventType.CardUpdated,
+      eventData
+    );
+
+    const event = await EntityHelper.create(newEvent, CardEvent);
+
+    return event;
+  } catch (error) {
+    console.error('Failed to log workflow state change:', error);
+    return null;
+  }
+};
+
 export const CardEventController = {
   list,
   create,
+  logWorkflowStateChange,
 };
