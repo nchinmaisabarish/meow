@@ -1,0 +1,298 @@
+openapi: 3.0.3
+info:
+  title: Tool Discovery API
+  description: |
+    API for discovering and querying available tools in the system.
+    This endpoint enables external agents and orchestration systems to programmatically
+    discover available operations and their schemas.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:9000/api
+    description: Local development server
+  - url: https://api.example.com/api
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /tools:
+    get:
+      summary: List all available tools
+      description: |
+        Returns a comprehensive list of all registered tools in the system.
+        Each tool includes its name, description, parameters schema, and return type.
+        This endpoint is designed for AI agents and external systems to discover
+        available operations dynamically.
+      operationId: listTools
+      tags:
+        - Tool Discovery
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully retrieved list of tools
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolsResponse'
+              examples:
+                success:
+                  summary: Example response with multiple tools
+                  value:
+                    tools:
+                      - name: create_card
+                        description: Creates a new card in the system with specified properties
+                        parameters:
+                          type: object
+                          properties:
+                            title:
+                              type: string
+                              description: The title of the card
+                            laneId:
+                              type: string
+                              description: ID of the lane where the card should be created
+                          required:
+                            - title
+                            - laneId
+                        returns:
+                          type: object
+                          description: The created card object with generated ID
+                      - name: list_cards
+                        description: Retrieves a list of cards with optional filtering
+                        parameters:
+                          type: object
+                          properties:
+                            laneId:
+                              type: string
+                              description: Filter cards by lane ID
+                          required: []
+                        returns:
+                          type: array
+                          description: Array of card objects matching the filter criteria
+                    count: 2
+                    timestamp: '2024-01-15T10:30:00.000Z'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tools/{name}:
+    get:
+      summary: Get a specific tool by name
+      description: |
+        Returns detailed information about a specific tool identified by its name.
+        This is useful when you need to retrieve the schema for a particular operation.
+      operationId: getTool
+      tags:
+        - Tool Discovery
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The unique name of the tool to retrieve
+          schema:
+            type: string
+          example: create_card
+      responses:
+        '200':
+          description: Successfully retrieved tool information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolSchema'
+              examples:
+                success:
+                  summary: Example tool schema
+                  value:
+                    name: create_card
+                    description: Creates a new card in the system with specified properties
+                    parameters:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                          description: The title of the card
+                        laneId:
+                          type: string
+                          description: ID of the lane where the card should be created
+                      required:
+                        - title
+                        - laneId
+                    returns:
+                      type: object
+                      description: The created card object with generated ID
+        '404':
+          description: Tool not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Tool not found
+                message: No tool registered with name: invalid_tool
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from the login endpoint
+
+  schemas:
+    ToolsResponse:
+      type: object
+      required:
+        - tools
+        - count
+        - timestamp
+      properties:
+        tools:
+          type: array
+          description: Array of all available tool schemas
+          items:
+            $ref: '#/components/schemas/ToolSchema'
+        count:
+          type: integer
+          description: Total number of available tools
+          example: 12
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of when the response was generated
+          example: '2024-01-15T10:30:00.000Z'
+
+    ToolSchema:
+      type: object
+      required:
+        - name
+        - description
+        - parameters
+      properties:
+        name:
+          type: string
+          description: Unique identifier for the tool
+          example: create_card
+        description:
+          type: string
+          description: Human-readable description of what the tool does
+          example: Creates a new card in the system with specified properties
+        parameters:
+          type: object
+          description: JSON Schema defining the tool's input parameters
+          required:
+            - type
+            - properties
+            - required
+          properties:
+            type:
+              type: string
+              enum: [object]
+              description: Always 'object' for tool parameters
+            properties:
+              type: object
+              description: Map of parameter names to their schemas
+              additionalProperties:
+                $ref: '#/components/schemas/ParameterSchema'
+            required:
+              type: array
+              description: List of required parameter names
+              items:
+                type: string
+        returns:
+          type: object
+          description: Schema describing the tool's return value
+          properties:
+            type:
+              type: string
+              description: The type of value returned
+              example: object
+            description:
+              type: string
+              description: Description of the return value
+              example: The created card object with generated ID
+
+    ParameterSchema:
+      type: object
+      required:
+        - type
+        - description
+      properties:
+        type:
+          type: string
+          description: JSON Schema type of the parameter
+          enum: [string, number, integer, boolean, array, object]
+          example: string
+        description:
+          type: string
+          description: Human-readable description of the parameter
+          example: The title of the card
+        required:
+          type: boolean
+          description: Whether this parameter is required
+          example: true
+        enum:
+          type: array
+          description: List of allowed values for the parameter
+          items:
+            type: string
+          example: [low, medium, high, urgent]
+        items:
+          type: object
+          description: Schema for array items (when type is 'array')
+          properties:
+            type:
+              type: string
+              example: string
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error type or category
+          example: Tool not found
+        message:
+          type: string
+          description: Detailed error message
+          example: No tool registered with name: invalid_tool
+        code:
+          type: string
+          description: Machine-readable error code
+          example: TOOL_NOT_FOUND
+
+tags:
+  - name: Tool Discovery
+    description: |
+      Endpoints for discovering available tools and their schemas.
+      These endpoints enable AI agents and external systems to programmatically
+      discover and understand available operations in the system.

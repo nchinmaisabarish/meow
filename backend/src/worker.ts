@@ -81,6 +81,8 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { ToolDiscoveryController } from './controllers/ToolDiscoveryController.js';
+import { registerDefaultTools } from './tools/registerDefaultTools.js';
 
 /* spinning up express */
 export const app = express();
@@ -110,6 +112,10 @@ try {
   await DatabaseHelper.connect(process.env.MONGODB_URI!);
 
   log.info('database connection established');
+
+  log.info('initialising tool registry');
+  registerDefaultTools();
+  log.info('tool registry initialised');
 
   const strategy = new NodeEventStrategy();
 
@@ -329,6 +335,16 @@ try {
   activity.route('/').get(ActivityController.list);
 
   app.use('/api/activities', activity);
+
+  const tools = express.Router();
+
+  tools.use(express.json({ limit: '5kb' }));
+  tools.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  tools.route('/').get(ToolDiscoveryController.list);
+  tools.route('/:name').get(ToolDiscoveryController.get);
+
+  app.use('/api/tools', tools);
 
   const unprotected = express.Router();
 
