@@ -81,8 +81,9 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { WorkflowRegistry } from './workflow/WorkflowRegistry.js';
+import { WorkflowExecutor } from './workflow/WorkflowExecutor.js';
 
-/* spinning up express */
 export const app = express();
 
 app.set('port', process.env.PORT || 9000);
@@ -97,12 +98,13 @@ let corsOptions: cors.CorsOptions = {
   methods: ['GET', 'POST', 'DELETE'],
 };
 
-/* enable CORS in production mode */
 if (process.env.NODE_ENV === 'production') {
   corsOptions.origin = false;
 }
 
 app.use(cors(corsOptions));
+
+let workflowExecutor: WorkflowExecutor;
 
 try {
   log.info('initialise database connection');
@@ -121,6 +123,13 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  log.info('initialise workflow execution engine');
+
+  const workflowRegistry = new WorkflowRegistry();
+  workflowExecutor = new WorkflowExecutor(workflowRegistry);
+
+  log.info('workflow execution engine initialized');
 
   const card = express.Router();
 
@@ -330,6 +339,101 @@ try {
 
   app.use('/api/activities', activity);
 
+  const workflow = express.Router();
+
+  workflow.use(express.json({ limit: '5kb' }));
+  workflow.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  workflow.route('/').post(async (req, res) => {
+    try {
+      const { workflowName, initialContext } = req.body;
+
+      if (!workflowName) {
+        return res.status(400).json({ error: 'workflowName is required' });
+      }
+
+      const result = await workflowExecutor.startWorkflow(workflowName, initialContext || {});
+
+      if (result.success) {
+        return res.status(201).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      log.error('Error starting workflow:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  workflow.route('/').get(async (req, res) => {
+    try {
+      const { workflowName } = req.query;
+      const instances = await workflowExecutor.listWorkflowInstances(
+        workflowName as string | undefined
+      );
+      return res.status(200).json({ instances });
+    } catch (error) {
+      log.error('Error listing workflow instances:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  workflow.route('/:id').get(async (req, res) => {
+    try {
+      const { id } = req.params;
+      const status = await workflowExecutor.getWorkflowStatus(id);
+
+      if (status) {
+        return res.status(200).json(status);
+      } else {
+        return res.status(404).json({ error: 'Workflow instance not found' });
+      }
+    } catch (error) {
+      log.error('Error getting workflow status:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  workflow.route('/:id/transition').post(async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { event, eventData } = req.body;
+
+      if (!event) {
+        return res.status(400).json({ error: 'event is required' });
+      }
+
+      const result = await workflowExecutor.executeTransition(id, event, eventData || {});
+
+      if (result.success) {
+        return res.status(200).json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      log.error('Error executing workflow transition:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  workflow.route('/:id').delete(async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await workflowExecutor.deleteWorkflowInstance(id);
+
+      if (deleted) {
+        return res.status(200).json({ success: true, message: 'Workflow instance deleted' });
+      } else {
+        return res.status(404).json({ error: 'Workflow instance not found' });
+      }
+    } catch (error) {
+      log.error('Error deleting workflow instance:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.use('/api/workflows', workflow);
+
   const unprotected = express.Router();
 
   unprotected.use(express.json({ limit: '1kb' }));
@@ -365,7 +469,6 @@ try {
   log.error(error);
 }
 
-/* return 404 for all other /api routes */
 app.all('/api/*', (req, res) => {
   res.status(404).end();
 });
@@ -386,3 +489,5 @@ try {
 } catch (error) {
   log.error(error);
 }
+
+export { workflowExecutor };
