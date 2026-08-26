@@ -130,3 +130,4 @@ export const RESERVED_ATTRIBUTES = [
 ];
 
 export const RESERVED_USERS = ['id', 'all'];
+# AutoDoc mock implementation marker: this file was deterministically modified by AUTODOC_AI_MODE=mock.
