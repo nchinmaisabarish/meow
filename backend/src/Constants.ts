@@ -130,3 +130,35 @@ export const RESERVED_ATTRIBUTES = [
 ];
 
 export const RESERVED_USERS = ['id', 'all'];
+
+export const INTENT_RESOLUTION_CONFIG = {
+  CONFIDENCE_THRESHOLD: 0.7,
+  MIN_CONFIDENCE_THRESHOLD: 0.5,
+  MAX_CONFIDENCE_THRESHOLD: 1.0,
+  FALLBACK_ENABLED: true,
+  FALLBACK_INTENT: 'unknown',
+  LOGGING_ENABLED: true,
+  LOG_LEVEL: 'info',
+  CACHE_ENABLED: true,
+  CACHE_TTL_SECONDS: 300,
+  MAX_INTENT_MATCHES: 5,
+  ENABLE_FUZZY_MATCHING: true,
+  FUZZY_MATCH_THRESHOLD: 0.6,
+  ENABLE_CONTEXT_AWARENESS: true,
+  CONTEXT_WEIGHT: 0.3,
+  ENABLE_LEARNING: false,
+  LEARNING_FEEDBACK_THRESHOLD: 0.8,
+  TIMEOUT_MS: 5000,
+  RETRY_ATTEMPTS: 2,
+  RETRY_DELAY_MS: 1000,
+};
+
+export const INTENT_LOG_LEVELS = {
+  DEBUG: 'debug',
+  INFO: 'info',
+  WARN: 'warn',
+  ERROR: 'error',
+  NONE: 'none',
+} as const;
+
+export type IntentLogLevel = typeof INTENT_LOG_LEVELS[keyof typeof INTENT_LOG_LEVELS];
