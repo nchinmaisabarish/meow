@@ -130,3 +130,4 @@ export const RESERVED_ATTRIBUTES = [
 ];
 
 export const RESERVED_USERS = ['id', 'all'];
+// Module overview: documented as part of an automated compatibility review.
