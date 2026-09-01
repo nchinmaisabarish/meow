@@ -14,6 +14,7 @@ import {
   validateAndFetchLane,
   validateAndFetchUser,
 } from '../helpers/EntityFetchHelper.js';
+import { createCardTool } from '../tools/CardTools.js';
 
 const extractDateLimitFromRequest = (req: AuthenticatedRequest): DateTime | undefined => {
   const maxDaysAgo = req.query['max-days-ago']
@@ -96,25 +97,23 @@ const create = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
       throw new EntityNotFoundError();
     }
 
-    const card = new NewCard(req.jwt.user, lane, body.name, parseInt(body.amount));
+    // Use the structured tool for card creation
+    const toolInput = {
+      cardTitle: body.name,
+      laneId: lane._id!.toString(),
+      accountId: req.jwt.user._id!.toString(),
+      amount: parseInt(body.amount),
+      attributes: body.attributes,
+      closedAt: body.closedAt && RequestParser.isValidDateTimeString(body.closedAt) 
+        ? body.closedAt 
+        : undefined,
+      nextFollowUpAt: body.nextFollowUpAt && RequestParser.isValidDateTimeString(body.nextFollowUpAt)
+        ? body.nextFollowUpAt
+        : undefined,
+    };
 
-    if (body.attributes) {
-      card.attributes = body.attributes;
-    }
-
-    if (body.closedAt && RequestParser.isValidDateTimeString(body.closedAt)) {
-      card.closedAt = RequestParser.toJsDate(body.closedAt);
-    }
-
-    if (body.nextFollowUpAt && RequestParser.isValidDateTimeString(body.nextFollowUpAt)) {
-      card.nextFollowUpAt = RequestParser.toJsDate(body.nextFollowUpAt);
-    }
-
-    const latest = await EntityHelper.create(card, Card);
-
-    emitCardEvent(req.jwt.user, latest!.toPlain());
-    emitLaneEvent(card.laneId, card.userId);
-    emitBoardEvent(lane.boardId, card.userId);
+    const result = await createCardTool.invoke(toolInput);
+    const latest = JSON.parse(result);
 
     return res.status(201).json(latest);
   } catch (error) {
