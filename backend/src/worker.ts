@@ -35,6 +35,7 @@ import express from 'express';
 import http from 'http';
 import { CardController } from './controllers/CardController.js';
 import { LoginController } from './controllers/LoginController.js';
+import { tools } from './tools/index.js';
 import { setHeaders } from './middlewares/setHeaders.js';
 import { rejectIfContentTypeIsNot } from './middlewares/rejectIfContentTypeIsNot.js';
 import { validateAgainst } from './middlewares/validateAgainst.js';
@@ -121,6 +122,8 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  log.info(`Loaded ${tools.length} structured tool(s) for orchestration`);
 
   const card = express.Router();
 
