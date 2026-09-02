@@ -29,6 +29,10 @@ function getCollection(name: string) {
   return client.db().collection(name);
 }
 
+function getClient() {
+  return client;
+}
+
 function close() {
   client.close();
 }
@@ -41,6 +45,7 @@ export const DatabaseHelper = {
   connect,
   get,
   getCollection,
+  getClient,
   close,
   isInitialized,
 };
