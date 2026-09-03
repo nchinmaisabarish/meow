@@ -31,9 +31,10 @@ mandatory.forEach((param) => {
 
 import cors from 'cors';
 import compression from 'compression';
-import express from 'express';
+import express, { Response, NextFunction } from 'express';
 import http from 'http';
 import { CardController } from './controllers/CardController.js';
+import { AuthenticatedRequest } from './requests/AuthenticatedRequest.js';
 import { LoginController } from './controllers/LoginController.js';
 import { setHeaders } from './middlewares/setHeaders.js';
 import { rejectIfContentTypeIsNot } from './middlewares/rejectIfContentTypeIsNot.js';
@@ -329,6 +330,34 @@ try {
   activity.route('/').get(ActivityController.list);
 
   app.use('/api/activities', activity);
+
+  const intent = express.Router();
+
+  intent.use(express.json({ limit: '5kb' }));
+
+  intent.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  intent.route('/').post(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { IntentResolver } = await import('./workflows/IntentResolver.js');
+      
+      const resolver = new IntentResolver(req.jwt.user, req.jwt.team);
+      const result = await resolver.resolve({
+        query: req.body.query || '',
+        context: req.body.context,
+      });
+
+      if (result.success) {
+        return res.json(result);
+      } else {
+        return res.status(400).json(result);
+      }
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.use('/api/intent', intent);
 
   const unprotected = express.Router();
 
