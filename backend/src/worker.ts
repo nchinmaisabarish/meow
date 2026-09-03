@@ -81,6 +81,7 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { IntentController } from './controllers/IntentController.js';
 
 /* spinning up express */
 export const app = express();
@@ -329,6 +330,17 @@ try {
   activity.route('/').get(ActivityController.list);
 
   app.use('/api/activities', activity);
+
+  const intent = express.Router();
+
+  intent.use(express.json({ limit: '5kb' }));
+
+  intent.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  intent.route('/').post(rejectIfContentTypeIsNot('application/json'), IntentController.resolve);
+  intent.route('/tools').get(IntentController.listTools);
+
+  app.use('/api/intent', intent);
 
   const unprotected = express.Router();
 
