@@ -81,6 +81,8 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { NaturalLanguageController } from './controllers/NaturalLanguageController.js';
+import { NaturalLanguageRequestSchema } from './middlewares/schema-validation/NaturalLanguageRequestSchema.js';
 
 /* spinning up express */
 export const app = express();
@@ -329,6 +331,27 @@ try {
   activity.route('/').get(ActivityController.list);
 
   app.use('/api/activities', activity);
+
+  const naturalLanguage = express.Router();
+
+  naturalLanguage.use(express.json({ limit: '5kb' }));
+
+  naturalLanguage.use(
+    verifyJwt,
+    addEntityToHeader,
+    setHeaders,
+    isDatabaseConnectionEstablished
+  );
+
+  naturalLanguage
+    .route('/query')
+    .post(
+      rejectIfContentTypeIsNot('application/json'),
+      validateAgainst(NaturalLanguageRequestSchema),
+      NaturalLanguageController.query
+    );
+
+  app.use('/api/nl', naturalLanguage);
 
   const unprotected = express.Router();
 
