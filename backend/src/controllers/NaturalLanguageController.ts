@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../requests/AuthenticatedRequest.js';
 import { getLLMService } from '../services/LLMService.js';
+import { getConversationMemory, ConversationMemory } from '../services/ConversationMemory.js';
 import { InvalidRequestBodyError } from '../errors/InvalidRequestBodyError.js';
 import { InvalidConfigurationError } from '../errors/InvalidConfigurationError.js';
 import { EntityHelper } from '../helpers/EntityHelper.js';
@@ -12,7 +13,7 @@ import { Team } from '../entities/Team.js';
 
 const query = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const { query: userQuery } = req.body;
+    const { query: userQuery, threadId: providedThreadId } = req.body;
 
     if (!userQuery || typeof userQuery !== 'string') {
       throw new InvalidRequestBodyError('Query field is required and must be a string');
@@ -24,8 +25,28 @@ const query = async (req: AuthenticatedRequest, res: Response, next: NextFunctio
       throw new InvalidConfigurationError('Natural language processing is not configured. Please contact your administrator.');
     }
 
-    // Process the query through the LLM
-    const llmResponse = await llmService.processQuery(userQuery);
+    // Get or create thread ID for this conversation
+    const userId = req.jwt.user._id?.toString();
+    const threadId = providedThreadId || ConversationMemory.getUserThreadId(userId!, 'nl_query');
+
+    // Get conversation memory
+    const conversationMemory = getConversationMemory();
+
+    // Retrieve recent conversation history for context
+    const recentHistory = await conversationMemory.getRecentHistory(threadId, 5);
+    
+    // Build context summary if there's history
+    let contextSummary = '';
+    if (recentHistory.length > 0) {
+      contextSummary = await conversationMemory.buildConversationSummary(threadId, 5);
+    }
+
+    // Process the query through the LLM (with context if available)
+    const queryWithContext = contextSummary 
+      ? `Previous conversation:\n${contextSummary}\n\nCurrent query: ${userQuery}`
+      : userQuery;
+    
+    const llmResponse = await llmService.processQuery(queryWithContext);
 
     // Execute the intent based on the LLM response
     let data: any = null;
@@ -74,7 +95,60 @@ const query = async (req: AuthenticatedRequest, res: Response, next: NextFunctio
       intent: llmResponse.intent,
       entity: llmResponse.entity,
       response: llmResponse.response,
-      data: data
+      data: data,
+      threadId: threadId,
+      conversationContext: {
+        checkpointCount: await conversationMemory.getCheckpointCount(threadId),
+        hasHistory: recentHistory.length > 0,
+      },
+    });
+  } catch (error: unknown) {
+    return next(error);
+  }
+};
+
+/**
+ * Clear conversation history for a user
+ */
+const clearHistory = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { threadId } = req.body;
+
+    if (!threadId || typeof threadId !== 'string') {
+      throw new InvalidRequestBodyError('threadId field is required and must be a string');
+    }
+
+    const conversationMemory = getConversationMemory();
+    await conversationMemory.clearThread(threadId);
+
+    return res.json({
+      success: true,
+      message: 'Conversation history cleared',
+    });
+  } catch (error: unknown) {
+    return next(error);
+  }
+};
+
+/**
+ * Get conversation history for a user
+ */
+const getHistory = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const threadId = req.query.threadId as string | undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+
+    if (!threadId) {
+      throw new InvalidRequestBodyError('threadId query parameter is required');
+    }
+
+    const conversationMemory = getConversationMemory();
+    const history = await conversationMemory.getRecentHistory(threadId, limit);
+
+    return res.json({
+      threadId,
+      history,
+      count: history.length,
     });
   } catch (error: unknown) {
     return next(error);
@@ -82,5 +156,7 @@ const query = async (req: AuthenticatedRequest, res: Response, next: NextFunctio
 };
 
 export const NaturalLanguageController = {
-  query
+  query,
+  clearHistory,
+  getHistory,
 };

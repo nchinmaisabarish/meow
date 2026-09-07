@@ -1,4 +1,4 @@
-import { CompiledStateGraph } from '@langchain/langgraph';
+import { CompiledStateGraph, BaseCheckpointSaver } from '@langchain/langgraph';
 import {
   createCardLifecycleGraph,
   CardWorkflowState,
@@ -17,6 +17,7 @@ import { emitBoardEvent, emitCardEvent, emitLaneEvent } from '../helpers/EventHe
 import { ObjectId } from 'mongodb';
 import { DateTime } from 'luxon';
 import { LaneType } from '../entities/Lane.js';
+import { MongoDBCheckpointer } from '../persistence/WorkflowCheckpointer.js';
 
 /**
  * WorkflowExecutor service
@@ -24,13 +25,29 @@ import { LaneType } from '../entities/Lane.js';
  */
 export class WorkflowExecutor {
   private graph: CompiledStateGraph<any, any, any> | null = null;
+  private checkpointer: BaseCheckpointSaver | null = null;
+
+  /**
+   * Set the checkpointer for workflow state persistence
+   */
+  public setCheckpointer(checkpointer: BaseCheckpointSaver): void {
+    this.checkpointer = checkpointer;
+    // Reset graph to force recompilation with new checkpointer
+    this.graph = null;
+  }
 
   /**
    * Initialize the workflow graph
    */
   public initializeGraph(): void {
     const stateGraph = createCardLifecycleGraph();
-    this.graph = stateGraph.compile();
+    
+    // Compile with checkpointer if available
+    if (this.checkpointer) {
+      this.graph = stateGraph.compile({ checkpointer: this.checkpointer });
+    } else {
+      this.graph = stateGraph.compile();
+    }
   }
 
   /**
@@ -335,12 +352,20 @@ export class WorkflowExecutor {
   /**
    * Execute the workflow with the given initial state
    */
-  private async executeWorkflow(initialState: CardWorkflowState): Promise<CardWorkflowState> {
+  private async executeWorkflow(
+    initialState: CardWorkflowState,
+    threadId?: string
+  ): Promise<CardWorkflowState> {
     const graph = this.getGraph();
 
     try {
-      // Invoke the graph with the initial state
-      const result = await graph.invoke(initialState);
+      // Build config with thread_id if checkpointer is enabled and threadId is provided
+      const config = threadId && this.checkpointer
+        ? { configurable: { thread_id: threadId } }
+        : undefined;
+
+      // Invoke the graph with the initial state and config
+      const result = await graph.invoke(initialState, config);
 
       return result as CardWorkflowState;
     } catch (error: unknown) {
@@ -353,6 +378,16 @@ export class WorkflowExecutor {
         error: errorMessage,
       };
     }
+  }
+
+  /**
+   * Execute the workflow with checkpointing enabled
+   */
+  public async executeWorkflowWithCheckpoint(
+    initialState: CardWorkflowState,
+    threadId: string
+  ): Promise<CardWorkflowState> {
+    return this.executeWorkflow(initialState, threadId);
   }
 
   /**
@@ -383,3 +418,12 @@ export class WorkflowExecutor {
 
 // Export a singleton instance
 export const workflowExecutor = new WorkflowExecutor();
+
+/**
+ * Initialize the workflow executor with MongoDB checkpointer
+ */
+export function initializeWorkflowExecutorWithCheckpointer(): void {
+  const checkpointer = new MongoDBCheckpointer();
+  // Type assertion needed due to @langchain/core version mismatch between main and langgraph dependencies
+  workflowExecutor.setCheckpointer(checkpointer as any as BaseCheckpointSaver);
+}
