@@ -45,7 +45,43 @@ const create = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
   }
 };
 
+// Static method for tool usage (without Express req/res)
+const getAccountEventsStatic = async (params: {
+  accountId: string;
+  userId: string;
+  teamId: string;
+}): Promise<AccountEvent[]> => {
+  const user = await EntityHelper.findOneById(
+    (await import('../entities/User.js')).User,
+    params.userId
+  );
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const team = await EntityHelper.findOneById(
+    (await import('../entities/Team.js')).Team,
+    params.teamId
+  );
+  if (!team || !EntityHelper.isEntityOwnedBy(team, user)) {
+    throw new Error('Team not found or access denied');
+  }
+
+  const query = {
+    accountId: { $eq: new ObjectId(params.accountId) },
+    teamId: { $eq: new ObjectId(params.teamId) },
+  };
+
+  const sort: Sort = {
+    updatedAt: -1,
+  };
+
+  const events = await EntityHelper.findBy(AccountEvent, query, sort);
+  return events;
+};
+
 export const AccountEventController = {
   list,
   create,
+  getAccountEventsStatic,
 };

@@ -7,6 +7,18 @@ import {
   deleteLaneTool,
   getLaneStatisticsTool,
 } from './LaneTools.js';
+import {
+  createAccountTool,
+  updateAccountTool,
+  deleteAccountTool,
+  getAccountEventsTool,
+} from './AccountTools.js';
+import {
+  createTeamTool,
+  updateTeamTool,
+  deleteTeamTool,
+  getTeamTool,
+} from './TeamTools.js';
 
 /**
  * Central registry of all available tools for agent systems.
@@ -23,6 +35,14 @@ export const ToolRegistry: StructuredToolInterface[] = [
   updateLaneTool,
   deleteLaneTool,
   getLaneStatisticsTool,
+  createAccountTool,
+  updateAccountTool,
+  deleteAccountTool,
+  getAccountEventsTool,
+  createTeamTool,
+  updateTeamTool,
+  deleteTeamTool,
+  getTeamTool,
 ];
 
 /**
@@ -30,3 +50,5 @@ export const ToolRegistry: StructuredToolInterface[] = [
  */
 export { createCardTool, getCardTool, updateCardTool, deleteCardTool };
 export { createLaneTool, getLaneTool, updateLaneTool, deleteLaneTool, getLaneStatisticsTool };
+export { createAccountTool, updateAccountTool, deleteAccountTool, getAccountEventsTool };
+export { createTeamTool, updateTeamTool, deleteTeamTool, getTeamTool };

@@ -87,9 +87,89 @@ const get = async (req: AuthenticatedRequest, res: Response, next: NextFunction)
   }
 };
 
+// Static methods for tool usage (without Express req/res)
+const createTeamStatic = async (params: {
+  name: string;
+  currency: string;
+  isFirstTeam?: boolean;
+}): Promise<import('../entities/Team.js').Team> => {
+  const { Team, NewTeam } = await import('../entities/Team.js');
+
+  const currencyCode = parseCurrencyCode(params.currency);
+
+  const team = new NewTeam(params.name, currencyCode, params.isFirstTeam);
+
+  const created = await EntityHelper.create(team, Team);
+
+  return created!;
+};
+
+const updateTeamStatic = async (params: {
+  teamId: string;
+  userId: string;
+  currency: string;
+}): Promise<import('../entities/Team.js').Team> => {
+  const user = await EntityHelper.findOneById(
+    (await import('../entities/User.js')).User,
+    params.userId
+  );
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const team = await validateAndFetchTeam(params.teamId, user);
+
+  team.currency = parseCurrencyCode(params.currency);
+
+  const updated = await EntityHelper.update(team);
+
+  return updated;
+};
+
+const deleteTeamStatic = async (params: {
+  teamId: string;
+  userId: string;
+}): Promise<import('../entities/Team.js').Team> => {
+  const { Team } = await import('../entities/Team.js');
+  const user = await EntityHelper.findOneById(
+    (await import('../entities/User.js')).User,
+    params.userId
+  );
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const team = await validateAndFetchTeam(params.teamId, user);
+
+  await EntityHelper.remove(Team, team);
+
+  return team;
+};
+
+const getTeamStatic = async (params: {
+  teamId: string;
+  userId: string;
+}): Promise<import('../entities/Team.js').Team> => {
+  const user = await EntityHelper.findOneById(
+    (await import('../entities/User.js')).User,
+    params.userId
+  );
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const team = await validateAndFetchTeam(params.teamId, user);
+
+  return team;
+};
+
 export const TeamController = {
   update,
   allowTeamRegistration,
   updateIntegration,
   get,
+  createTeamStatic,
+  updateTeamStatic,
+  deleteTeamStatic,
+  getTeamStatic,
 };
