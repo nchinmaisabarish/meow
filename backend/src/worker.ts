@@ -83,6 +83,7 @@ import { CardForecastEventListener } from './events/CardForecastEventListener.js
 import { ActivityController } from './controllers/ActivityController.js';
 import { NaturalLanguageController } from './controllers/NaturalLanguageController.js';
 import { NaturalLanguageRequestSchema } from './middlewares/schema-validation/NaturalLanguageRequestSchema.js';
+import { handleIntentRequest, listIntents } from './middlewares/IntentMiddleware.js';
 
 /* spinning up express */
 export const app = express();
@@ -352,6 +353,25 @@ try {
     );
 
   app.use('/api/nl', naturalLanguage);
+
+  const intent = express.Router();
+
+  intent.use(express.json({ limit: '5kb' }));
+
+  intent.use(
+    verifyJwt,
+    addEntityToHeader,
+    setHeaders,
+    isDatabaseConnectionEstablished
+  );
+
+  intent.route('/').post(
+    rejectIfContentTypeIsNot('application/json'),
+    handleIntentRequest
+  );
+  intent.route('/').get(listIntents);
+
+  app.use('/api/intent', intent);
 
   const unprotected = express.Router();
 
