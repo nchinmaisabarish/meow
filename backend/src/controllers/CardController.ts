@@ -15,6 +15,7 @@ import {
   validateAndFetchLane,
   validateAndFetchUser,
 } from '../helpers/EntityFetchHelper.js';
+import { workflowExecutor } from '../services/WorkflowExecutor.js';
 
 const extractDateLimitFromRequest = (req: AuthenticatedRequest): DateTime | undefined => {
   const maxDaysAgo = req.query['max-days-ago']
@@ -239,6 +240,7 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
 };
 
 // Static methods for tool usage (without Express req/res)
+// These methods now use the workflow executor for stateful lifecycle management
 const createCardStatic = async (params: {
   userId: string;
   teamId: string;
@@ -249,47 +251,13 @@ const createCardStatic = async (params: {
   closedAt?: string;
   nextFollowUpAt?: string;
 }): Promise<Card> => {
-  const user = await EntityHelper.findOneById(User, params.userId);
-  if (!user) {
-    throw new EntityNotFoundError();
-  }
-
-  const lane = await EntityHelper.findOneById(Lane, params.laneId);
-  if (!lane || !EntityHelper.isEntityOwnedBy(lane, user)) {
-    throw new EntityNotFoundError();
-  }
-
-  const card = new NewCard(user, lane, params.name, params.amount);
-
-  if (params.attributes) {
-    card.attributes = params.attributes;
-  }
-
-  if (params.closedAt && RequestParser.isValidDateTimeString(params.closedAt)) {
-    card.closedAt = RequestParser.toJsDate(params.closedAt);
-  }
-
-  if (params.nextFollowUpAt && RequestParser.isValidDateTimeString(params.nextFollowUpAt)) {
-    card.nextFollowUpAt = RequestParser.toJsDate(params.nextFollowUpAt);
-  }
-
-  const latest = await EntityHelper.create(card, Card);
-
-  emitCardEvent(user, latest!.toPlain());
-  emitLaneEvent(card.laneId, card.userId);
-  emitBoardEvent(lane.boardId, card.userId);
-
-  return latest!;
+  // Execute card creation through workflow
+  return await workflowExecutor.executeCreateCard(params);
 };
 
 const getCardStatic = async (params: { cardId: string; userId: string }): Promise<Card> => {
-  const user = await EntityHelper.findOneById(User, params.userId);
-  if (!user) {
-    throw new EntityNotFoundError();
-  }
-
-  const card = await validateAndFetchCard(params.cardId, user);
-  return card;
+  // Execute card get through workflow
+  return await workflowExecutor.executeGetCard(params);
 };
 
 const updateCardStatic = async (params: {
@@ -304,121 +272,13 @@ const updateCardStatic = async (params: {
   closedAt?: string;
   nextFollowUpAt?: string;
 }): Promise<Card> => {
-  const user = await EntityHelper.findOneById(User, params.userId);
-  if (!user) {
-    throw new EntityNotFoundError();
-  }
-
-  const card = await validateAndFetchCard(params.cardId, user);
-  const previous = card.toPlain();
-
-  card.name = params.name;
-
-  let previousUserId = undefined;
-
-  if (params.assignedUserId && card.userId.toString() !== params.assignedUserId.toString()) {
-    const assignedUser = await validateAndFetchUser(params.assignedUserId, user);
-    previousUserId = card.userId;
-    card.userId = assignedUser._id!;
-  }
-
-  if (params.attributes) {
-    card.attributes = params.attributes;
-  }
-
-  let previousAmount = undefined;
-
-  if (card.amount !== params.amount) {
-    previousAmount = card.amount;
-    card.amount = params.amount;
-  }
-
-  if (params.status) {
-    card.status = parseCardStatus(params.status);
-  }
-
-  if (params.closedAt && !RequestParser.isEqualDates(params.closedAt, card.closedAt)) {
-    const closedAt = RequestParser.toJsDate(params.closedAt);
-    card.closedAt = closedAt;
-  }
-
-  if (
-    params.nextFollowUpAt &&
-    !RequestParser.isEqualDates(params.nextFollowUpAt, card.nextFollowUpAt)
-  ) {
-    const nextFollowUpAt = RequestParser.toJsDate(params.nextFollowUpAt);
-    card.nextFollowUpAt = nextFollowUpAt;
-  }
-
-  let previousLaneId: ObjectId | undefined = undefined;
-
-  if (params.laneId) {
-    const lane = await validateAndFetchLane(params.laneId, user);
-
-    if (params.laneId.toString() !== card.laneId.toString()) {
-      previousLaneId = card.laneId;
-      card.inLaneSince = new Date();
-    }
-
-    card.laneId = lane._id!;
-
-    if (lane.tags?.type && lane.tags.type !== LaneType.Normal) {
-      const closedAt = DateTime.utc().startOf('day');
-      card.closedAt = closedAt.toJSDate();
-    }
-  }
-
-  const latest = await EntityHelper.update(card);
-
-  /* emit events */
-
-  /* if lane has changed emit events for the previous and current lane */
-  if (previousLaneId) {
-    emitLaneEvent(previousLaneId, card.userId);
-    emitLaneEvent(card.laneId, card.userId);
-  }
-
-  /* if card has a changed amount update the lane and user */
-  if (previousAmount) {
-    emitLaneEvent(card.laneId, card.userId);
-  }
-
-  const lane = await EntityHelper.findOneById(Lane, card.laneId);
-
-  /* if card assignment has changed update lane and both users */
-  if (previousUserId) {
-    emitLaneEvent(card.laneId, previousUserId);
-    emitLaneEvent(card.laneId, card.userId);
-
-    emitBoardEvent(lane!.boardId, previousUserId);
-  }
-
-  emitCardEvent(user, latest.toPlain(), previous);
-  emitBoardEvent(lane!.boardId, card.userId);
-
-  return latest;
+  // Execute card update through workflow
+  return await workflowExecutor.executeUpdateCard(params);
 };
 
 const deleteCardStatic = async (params: { cardId: string; userId: string }): Promise<Card> => {
-  const user = await EntityHelper.findOneById(User, params.userId);
-  if (!user) {
-    throw new EntityNotFoundError();
-  }
-
-  const card = await validateAndFetchCard(params.cardId, user);
-  const previous = card.toPlain();
-
-  card.status = CardStatus.Deleted;
-
-  const latest = await EntityHelper.update(card);
-
-  emitCardEvent(user, latest.toPlain(), previous);
-  emitLaneEvent(card.laneId, card.userId);
-
-  const lane = await EntityHelper.findOneById(Lane, card.laneId);
-  emitBoardEvent(lane!.boardId, card.userId);
-
-  return latest;
+  // Execute card delete through workflow
+  return await workflowExecutor.executeDeleteCard(params);
 };
 
 export const CardController = {
