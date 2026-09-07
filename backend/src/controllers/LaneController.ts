@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../requests/AuthenticatedRequest.js';
 import { Board, NewBoard } from '../entities/Board.js';
 import { validateAndFetchLane } from '../helpers/EntityFetchHelper.js';
 import { emitLaneEvent } from '../helpers/EventHelper.js';
+import { EntityNotFoundError } from '../errors/EntityNotFoundError.js';
 
 const list = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -102,8 +103,122 @@ const updateAll = async (req: AuthenticatedRequest, res: Response, next: NextFun
   }
 };
 
+// Static methods for tool usage (without Express req/res)
+const createLaneStatic = async (params: {
+  userId: string;
+  teamId: string;
+  boardId: string;
+  name: string;
+  index: number;
+  color?: string;
+  inForecast?: boolean;
+  tags?: { [key: string]: string | boolean };
+}): Promise<Lane> => {
+  const user = await EntityHelper.findOneById(
+    (await import('../entities/User.js')).User,
+    params.userId
+  );
+  if (!user) {
+    throw new EntityNotFoundError();
+  }
+
+  const team = await EntityHelper.findOneById(
+    (await import('../entities/Team.js')).Team,
+    params.teamId
+  );
+  if (!team || !EntityHelper.isEntityOwnedBy(team, user)) {
+    throw new EntityNotFoundError();
+  }
+
+  const board = await EntityHelper.findOneById(Board, params.boardId);
+  if (!board || !EntityHelper.isEntityOwnedBy(board, user)) {
+    throw new EntityNotFoundError();
+  }
+
+  const lane = new NewLane(
+    team,
+    board,
+    params.name,
+    params.index,
+    params.color ?? '',
+    params.inForecast ?? false,
+    params.tags ?? {}
+  );
+
+  const created = await EntityHelper.create(lane, Lane);
+
+  emitLaneEvent(created!._id);
+
+  return created!;
+};
+
+const getLaneStatic = async (params: { laneId: string; userId: string }): Promise<Lane> => {
+  const user = await EntityHelper.findOneById(
+    (await import('../entities/User.js')).User,
+    params.userId
+  );
+  if (!user) {
+    throw new EntityNotFoundError();
+  }
+
+  const lane = await validateAndFetchLane(params.laneId, user);
+  return lane;
+};
+
+const updateLaneStatic = async (params: {
+  laneId: string;
+  userId: string;
+  name: string;
+  inForecast: boolean;
+  tags?: { [key: string]: string | boolean };
+}): Promise<Lane> => {
+  const user = await EntityHelper.findOneById(
+    (await import('../entities/User.js')).User,
+    params.userId
+  );
+  if (!user) {
+    throw new EntityNotFoundError();
+  }
+
+  const lane = await validateAndFetchLane(params.laneId, user);
+
+  lane.name = params.name;
+  lane.inForecast = params.inForecast;
+  if (params.tags !== undefined) {
+    lane.tags = params.tags;
+  }
+
+  const updated = await EntityHelper.update(lane);
+
+  emitLaneEvent(lane._id);
+
+  return updated;
+};
+
+const deleteLaneStatic = async (params: { laneId: string; userId: string }): Promise<Lane> => {
+  const user = await EntityHelper.findOneById(
+    (await import('../entities/User.js')).User,
+    params.userId
+  );
+  if (!user) {
+    throw new EntityNotFoundError();
+  }
+
+  const lane = await validateAndFetchLane(params.laneId, user);
+
+  await EntityHelper.remove(Lane, lane);
+
+  emitLaneEvent(lane._id);
+
+  return lane;
+};
+
 export const LaneController = {
   list,
   update,
   updateAll,
+  createLaneStatic,
+  getLaneStatic,
+  updateLaneStatic,
+  deleteLaneStatic,
 };

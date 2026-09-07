@@ -280,6 +280,54 @@ const get = async (req: AuthenticatedRequest, res: Response, next: NextFunction)
   }
 };
 
+// Static method for tool usage (without Express req/res)
+const getLaneStatisticsStatic = async (params: {
+  teamId: string;
+  userId?: string;
+  filter?: string;
+  text?: string;
+}): Promise<{ active: any[]; lost: any[]; won: any[] }> => {
+  const { Team } = await import('../entities/Team.js');
+  const team = await EntityHelper.findOneById(Team, params.teamId);
+  if (!team) {
+    throw new Error('Team not found');
+  }
+
+  const teamId = team._id;
+  const userId = params.userId ? new ObjectId(params.userId) : undefined;
+
+  const lanes = await EntityHelper.findByTeam(Lane, team);
+
+  const filter = params.filter ? parseFilterParameter(params.filter) : undefined;
+
+  const filterText = params.text;
+
+  const active = await getActiveStatisticsByLanes(
+    teamId,
+    lanes.filter((lane) => lane.tags.type === LaneType.Normal),
+    filter,
+    userId,
+    filterText
+  );
+
+  const won = await getMovementStatisticsByLanes(
+    teamId,
+    lanes.filter((lane) => lane.tags.type === LaneType.ClosedWon),
+    userId,
+    filterText
+  );
+
+  const lost = await getMovementStatisticsByLanes(
+    teamId,
+    lanes.filter((lane) => lane.tags.type === LaneType.ClosedLost),
+    userId,
+    filterText
+  );
+
+  return { active, lost, won };
+};
+
 export const LaneStatisticsController = {
   get,
+  getLaneStatisticsStatic,
 };

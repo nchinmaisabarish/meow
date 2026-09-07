@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { DateTime } from 'luxon';
 import { Card, CardStatus, NewCard } from '../entities/Card.js';
 import { Lane, LaneType } from '../entities/Lane.js';
+import { User } from '../entities/User.js';
 import { InvalidCardPropertyError } from '../errors/InvalidCardPropertyError.js';
 import { EntityHelper } from '../helpers/EntityHelper.js';
 import { RequestParser } from '../helpers/RequestParser.js';
@@ -14,6 +15,7 @@ import {
   validateAndFetchLane,
   validateAndFetchUser,
 } from '../helpers/EntityFetchHelper.js';
+import { workflowExecutor } from '../services/WorkflowExecutor.js';
 
 const extractDateLimitFromRequest = (req: AuthenticatedRequest): DateTime | undefined => {
   const maxDaysAgo = req.query['max-days-ago']
@@ -237,9 +239,55 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
   }
 };
 
+// Static methods for tool usage (without Express req/res)
+// These methods now use the workflow executor for stateful lifecycle management
+const createCardStatic = async (params: {
+  userId: string;
+  teamId: string;
+  laneId: string;
+  name: string;
+  amount: number;
+  attributes?: { [key: string]: string | number | null };
+  closedAt?: string;
+  nextFollowUpAt?: string;
+}): Promise<Card> => {
+  // Execute card creation through workflow
+  return await workflowExecutor.executeCreateCard(params);
+};
+
+const getCardStatic = async (params: { cardId: string; userId: string }): Promise<Card> => {
+  // Execute card get through workflow
+  return await workflowExecutor.executeGetCard(params);
+};
+
+const updateCardStatic = async (params: {
+  cardId: string;
+  userId: string;
+  name: string;
+  amount: number;
+  laneId?: string;
+  assignedUserId?: string;
+  attributes?: { [key: string]: string | number | null };
+  status?: string;
+  closedAt?: string;
+  nextFollowUpAt?: string;
+}): Promise<Card> => {
+  // Execute card update through workflow
+  return await workflowExecutor.executeUpdateCard(params);
+};
+
+const deleteCardStatic = async (params: { cardId: string; userId: string }): Promise<Card> => {
+  // Execute card delete through workflow
+  return await workflowExecutor.executeDeleteCard(params);
+};
+
 export const CardController = {
   list,
   get,
   create,
   update,
+  createCardStatic,
+  getCardStatic,
+  updateCardStatic,
+  deleteCardStatic,
 };

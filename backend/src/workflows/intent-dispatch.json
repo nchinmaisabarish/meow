@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "description": "Intent-to-tool mapping configuration for dynamic request routing",
+  "intents": {
+    "card_management": {
+      "description": "Operations on cards (opportunities/deals) in the sales pipeline",
+      "actions": {
+        "create": {
+          "toolName": "create_card",
+          "requiredParameters": ["name", "amount", "laneId"],
+          "optionalParameters": ["attributes", "closedAt", "nextFollowUpAt"]
+        },
+        "get": {
+          "toolName": "get_card",
+          "requiredParameters": ["cardId"],
+          "optionalParameters": []
+        },
+        "update": {
+          "toolName": "update_card",
+          "requiredParameters": ["cardId", "name", "amount"],
+          "optionalParameters": ["laneId", "assignedUserId", "attributes", "status", "closedAt", "nextFollowUpAt"]
+        },
+        "delete": {
+          "toolName": "delete_card",
+          "requiredParameters": ["cardId"],
+          "optionalParameters": []
+        }
+      }
+    },
+    "lane_operations": {
+      "description": "Operations on lanes (pipeline stages)",
+      "actions": {
+        "create": {
+          "toolName": "create_lane",
+          "requiredParameters": ["name", "index", "boardId"],
+          "optionalParameters": ["color", "inForecast", "tags"]
+        },
+        "get": {
+          "toolName": "get_lane",
+          "requiredParameters": ["laneId"],
+          "optionalParameters": []
+        },
+        "update": {
+          "toolName": "update_lane",
+          "requiredParameters": ["laneId", "name", "inForecast"],
+          "optionalParameters": ["tags"]
+        },
+        "delete": {
+          "toolName": "delete_lane",
+          "requiredParameters": ["laneId"],
+          "optionalParameters": []
+        },
+        "statistics": {
+          "toolName": "get_lane_statistics",
+          "requiredParameters": ["teamId"],
+          "optionalParameters": ["userId", "filter", "text"]
+        }
+      }
+    },
+    "team_administration": {
+      "description": "Operations on teams, users, and settings",
+      "actions": {
+        "get_team": {
+          "toolName": null,
+          "note": "Team information is available from context, no tool needed"
+        }
+      }
+    },
+    "account_management": {
+      "description": "Operations on accounts (companies/contacts)",
+      "actions": {
+        "create": {
+          "toolName": null,
+          "note": "Account tools not yet implemented in registry"
+        },
+        "list": {
+          "toolName": null,
+          "note": "Account tools not yet implemented in registry"
+        }
+      }
+    },
+    "analytics": {
+      "description": "Retrieving statistics, forecasts, and reports",
+      "actions": {
+        "lane_statistics": {
+          "toolName": "get_lane_statistics",
+          "requiredParameters": ["teamId"],
+          "optionalParameters": ["userId", "filter", "text"]
+        }
+      }
+    }
+  },
+  "fallback": {
+    "description": "Default behavior when intent cannot be classified or tool is not available",
+    "action": "return_error",
+    "message": "Unable to process request. Please provide more specific information or use the standard API endpoints."
+  }
+}
