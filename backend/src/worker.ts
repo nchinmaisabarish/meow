@@ -82,6 +82,8 @@ import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
 import { cardTools, cardToolsArray } from './tools/card-tools.js';
+import { laneTools, laneToolsArray } from './tools/lane-tools.js';
+import { teamTools, teamToolsArray } from './tools/team-tools.js';
 
 /* spinning up express */
 export const app = express();
@@ -108,9 +110,11 @@ app.use(cors(corsOptions));
 /* Initialize LangChain tools registry */
 export const toolsRegistry = {
   card: cardTools,
+  lane: laneTools,
+  team: teamTools,
 };
 
-export const allTools = [...cardToolsArray];
+export const allTools = [...cardToolsArray, ...laneToolsArray, ...teamToolsArray];
 
 try {
   log.info('initialise database connection');
