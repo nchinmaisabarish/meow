@@ -1,6 +1,7 @@
 import { StructuredToolInterface } from '@langchain/core/tools';
 import { User } from '../entities/User.js';
 import { createCardTool, updateCardTool, getCardTool, moveCardToLaneTool } from './CardTools.js';
+import { getUserTool, listTeamMembersTool, updateUserProfileTool } from './TeamUserTools.js';
 
 /**
  * Tool Registry that provides access to all available structured tools
@@ -14,6 +15,9 @@ export class ToolRegistry {
       updateCardTool(authenticatedUser),
       getCardTool(authenticatedUser),
       moveCardToLaneTool(authenticatedUser),
+      getUserTool(authenticatedUser),
+      listTeamMembersTool(authenticatedUser),
+      updateUserProfileTool(authenticatedUser),
     ];
   }
 
