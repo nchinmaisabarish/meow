@@ -83,6 +83,8 @@ import { CardForecastEventListener } from './events/CardForecastEventListener.js
 import { ActivityController } from './controllers/ActivityController.js';
 import { NaturalLanguageController } from './controllers/NaturalLanguageController.js';
 import { NaturalLanguageQueryRequestSchema } from './middlewares/schema-validation/NaturalLanguageQueryRequestSchema.js';
+import { createToolRegistry } from './tools/ToolRegistry.js';
+import { AuthenticatedRequest } from './requests/AuthenticatedRequest.js';
 
 /* spinning up express */
 export const app = express();
@@ -347,6 +349,28 @@ try {
     );
 
   app.use('/api/nl-query', nlQuery);
+
+  const tools = express.Router();
+
+  tools.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  tools.route('/').get((req: AuthenticatedRequest, res) => {
+    try {
+      const registry = createToolRegistry(req.jwt.user);
+      const schemas = registry.getToolSchemas();
+      
+      return res.json({
+        tools: schemas,
+      });
+    } catch (error) {
+      log.error(error);
+      return res.status(500).json({
+        error: 'Failed to retrieve tool schemas',
+      });
+    }
+  });
+
+  app.use('/api/tools', tools);
 
   const unprotected = express.Router();
 
