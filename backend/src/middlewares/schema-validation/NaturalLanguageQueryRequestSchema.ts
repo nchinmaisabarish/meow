@@ -1,0 +1,8 @@
+export const NaturalLanguageQueryRequestSchema = {
+  type: 'object',
+  properties: {
+    query: { type: 'string', minLength: 1 },
+  },
+  required: ['query'],
+  additionalProperties: false,
+};
