@@ -81,6 +81,9 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { cardTools, cardToolsArray } from './tools/card-tools.js';
+import { laneTools, laneToolsArray } from './tools/lane-tools.js';
+import { teamTools, teamToolsArray } from './tools/team-tools.js';
 
 /* spinning up express */
 export const app = express();
@@ -104,6 +107,15 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(cors(corsOptions));
 
+/* Initialize LangChain tools registry */
+export const toolsRegistry = {
+  card: cardTools,
+  lane: laneTools,
+  team: teamTools,
+};
+
+export const allTools = [...cardToolsArray, ...laneToolsArray, ...teamToolsArray];
+
 try {
   log.info('initialise database connection');
 
@@ -121,6 +133,8 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  log.info(`initialized LangChain tools registry with ${allTools.length} tools`);
 
   const card = express.Router();
 
