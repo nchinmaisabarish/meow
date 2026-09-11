@@ -5,6 +5,8 @@ import { AuthenticatedRequest } from '../requests/AuthenticatedRequest.js';
 import { Board, NewBoard } from '../entities/Board.js';
 import { validateAndFetchLane } from '../helpers/EntityFetchHelper.js';
 import { emitLaneEvent } from '../helpers/EventHelper.js';
+import { Team } from '../entities/Team.js';
+import { EntityNotFoundError } from '../errors/EntityNotFoundError.js';
 
 const list = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -102,8 +104,144 @@ const updateAll = async (req: AuthenticatedRequest, res: Response, next: NextFun
   }
 };
 
+/**
+ * Creates a lane from tool input (for LangChain tool usage)
+ * This method can be called programmatically without an HTTP request
+ */
+const createLaneFromTool = async (params: {
+  teamId: string;
+  boardId: string;
+  name: string;
+  index: number;
+  color?: string;
+  inForecast?: boolean;
+  tags?: { [key: string]: string | boolean };
+}): Promise<Lane> => {
+  // Fetch and validate the team
+  const team = await EntityHelper.findOneById(Team, params.teamId);
+  if (!team) {
+    throw new EntityNotFoundError();
+  }
+
+  // Fetch and validate the board
+  const board = await EntityHelper.findOneById(Board, params.boardId);
+  if (!board || board.teamId.toString() !== team._id.toString()) {
+    throw new EntityNotFoundError();
+  }
+
+  // Create the new lane
+  const lane = new NewLane(
+    team,
+    board,
+    params.name,
+    params.index,
+    params.color ?? '',
+    params.inForecast ?? false,
+    params.tags ?? {}
+  );
+
+  // Save the lane to the database
+  const latest = await EntityHelper.create(lane, Lane);
+
+  if (!latest) {
+    throw new Error('Failed to create lane');
+  }
+
+  // Emit events
+  emitLaneEvent(latest._id);
+
+  return latest;
+};
+
+/**
+ * Updates a lane from tool input (for LangChain tool usage)
+ * This method can be called programmatically without an HTTP request
+ */
+const updateLaneFromTool = async (params: {
+  laneId: string;
+  teamId: string;
+  name?: string;
+  color?: string;
+  inForecast?: boolean;
+  tags?: { [key: string]: string | boolean };
+}): Promise<Lane> => {
+  // Fetch and validate the team
+  const team = await EntityHelper.findOneById(Team, params.teamId);
+  if (!team) {
+    throw new EntityNotFoundError();
+  }
+
+  // Fetch and validate the lane
+  const lane = await EntityHelper.findOneById(Lane, params.laneId);
+  if (!lane || lane.teamId.toString() !== team._id.toString()) {
+    throw new EntityNotFoundError();
+  }
+
+  // Update lane properties
+  if (params.name !== undefined) {
+    lane.name = params.name;
+  }
+  if (params.color !== undefined) {
+    lane.color = params.color;
+  }
+  if (params.inForecast !== undefined) {
+    lane.inForecast = params.inForecast;
+  }
+  if (params.tags !== undefined) {
+    lane.tags = params.tags;
+  }
+
+  // Save the updated lane
+  const updated = await EntityHelper.update(lane);
+
+  // Emit events
+  emitLaneEvent(updated._id);
+
+  return updated;
+};
+
+/**
+ * Reorders lanes from tool input (for LangChain tool usage)
+ * This method can be called programmatically without an HTTP request
+ */
+const reorderLanesFromTool = async (params: {
+  teamId: string;
+  lanes: Array<{ laneId: string; index: number }>;
+}): Promise<Lane[]> => {
+  // Fetch and validate the team
+  const team = await EntityHelper.findOneById(Team, params.teamId);
+  if (!team) {
+    throw new EntityNotFoundError();
+  }
+
+  const updatedLanes: Lane[] = [];
+
+  // Update each lane's index
+  await Promise.all(
+    params.lanes.map(async (laneUpdate: { laneId: string; index: number }) => {
+      const lane = await EntityHelper.findOneById(Lane, laneUpdate.laneId);
+      
+      if (!lane || lane.teamId.toString() !== team._id.toString()) {
+        throw new EntityNotFoundError();
+      }
+
+      lane.index = laneUpdate.index;
+      const updated = await EntityHelper.update(lane);
+      
+      emitLaneEvent(updated._id);
+      updatedLanes.push(updated);
+    })
+  );
+
+  // Sort by index before returning
+  return updatedLanes.sort((a: Lane, b: Lane) => a.index - b.index);
+};
+
 export const LaneController = {
   list,
   update,
   updateAll,
+  createLaneFromTool,
+  updateLaneFromTool,
+  reorderLanesFromTool,
 };

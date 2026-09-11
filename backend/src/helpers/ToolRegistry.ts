@@ -1,5 +1,6 @@
 import { StructuredToolInterface } from '@langchain/core/tools';
 import { createCardTool } from '../tools/CardTools.js';
+import { createLaneTool, updateLaneTool, reorderLanesTool } from '../tools/LaneTools.js';
 
 /**
  * Registry of all available LangChain tools for the application
@@ -7,6 +8,9 @@ import { createCardTool } from '../tools/CardTools.js';
  */
 export const availableTools: StructuredToolInterface[] = [
   createCardTool,
+  createLaneTool,
+  updateLaneTool,
+  reorderLanesTool,
 ];
 
 /**
