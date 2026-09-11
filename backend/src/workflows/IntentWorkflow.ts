@@ -1,7 +1,26 @@
-import { StateGraph, Annotation, END } from '@langchain/langgraph';
+import { StateGraph, Annotation, END, BaseCheckpointSaver } from '@langchain/langgraph';
 import { WorkflowState, WorkflowStateHelper } from '../helpers/WorkflowStateHelper.js';
 import { getAllTools } from '../helpers/ToolRegistry.js';
 import { OpenAIHelper } from '../helpers/OpenAIHelper.js';
+import { CheckpointerHelper } from '../helpers/CheckpointerHelper.js';
+
+/**
+ * Intent Workflow - Natural language processing workflow for handling user requests
+ * 
+ * This workflow supports conversation state persistence using MongoDB checkpointer.
+ * 
+ * Usage with checkpointer:
+ * ```typescript
+ * // Single request without persistence
+ * const response = await executeIntentWorkflow(userRequest, user, team);
+ * 
+ * // Multi-turn conversation with persistence
+ * const threadId = 'conversation-123';
+ * const response1 = await executeIntentWorkflow(userRequest1, user, team, threadId);
+ * const response2 = await executeIntentWorkflow(userRequest2, user, team, threadId);
+ * // The workflow can access state from previous requests in the same thread
+ * ```
+ */
 
 /**
  * Define the state annotation for the workflow
@@ -177,8 +196,9 @@ function shouldExecuteTool(state: typeof WorkflowStateAnnotation.State): string 
 
 /**
  * Create and compile the intent workflow graph
+ * @param checkpointer Optional checkpoint saver for state persistence
  */
-export function createIntentWorkflow() {
+export function createIntentWorkflow(checkpointer?: BaseCheckpointSaver) {
   // Create a new state graph
   const workflow = new StateGraph(WorkflowStateAnnotation)
     // Add nodes for each step in the workflow
@@ -196,26 +216,43 @@ export function createIntentWorkflow() {
     .addEdge('executeTool', 'formatResponse')
     .addEdge('formatResponse', '__end__');
 
-  // Compile the graph
-  return workflow.compile();
+  // Compile the graph with optional checkpointer
+  return workflow.compile({ checkpointer });
 }
 
 /**
  * Execute the intent workflow with the given state
+ * @param userRequest The user's natural language request
+ * @param user The authenticated user
+ * @param team The team context
+ * @param threadId Optional thread ID for conversation persistence
+ * @param useCheckpointer Whether to use checkpointer for state persistence (default: true)
  */
 export async function executeIntentWorkflow(
   userRequest: string,
   user: WorkflowState['user'],
-  team: WorkflowState['team']
+  team: WorkflowState['team'],
+  threadId?: string,
+  useCheckpointer: boolean = true
 ): Promise<WorkflowState['response']> {
-  // Create the workflow
-  const workflow = createIntentWorkflow();
+  // Get checkpointer if enabled
+  const checkpointer = useCheckpointer ? CheckpointerHelper.getCheckpointer() : undefined;
+  
+  // Create the workflow with optional checkpointer
+  const workflow = createIntentWorkflow(checkpointer);
 
   // Create initial state
   const initialState = WorkflowStateHelper.createInitialState(userRequest, user, team);
 
+  // Build config with optional thread_id for persistence
+  const config = threadId ? {
+    configurable: {
+      thread_id: threadId,
+    },
+  } : undefined;
+
   // Execute the workflow
-  const result = await workflow.invoke(initialState);
+  const result = await workflow.invoke(initialState, config);
 
   // Return the response
   return result.response || {
