@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { DateTime } from 'luxon';
 import { Card, CardStatus, NewCard } from '../entities/Card.js';
 import { Lane, LaneType } from '../entities/Lane.js';
+import { User } from '../entities/User.js';
 import { InvalidCardPropertyError } from '../errors/InvalidCardPropertyError.js';
 import { EntityHelper } from '../helpers/EntityHelper.js';
 import { RequestParser } from '../helpers/RequestParser.js';
@@ -237,9 +238,66 @@ const update = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
   }
 };
 
+/**
+ * Creates a card from tool input (for LangChain tool usage)
+ * This method can be called programmatically without an HTTP request
+ */
+const createCardFromTool = async (params: {
+  userId: string;
+  laneId: string;
+  name: string;
+  amount: number;
+  attributes?: { [key: string]: string | number | null };
+  closedAt?: string;
+  nextFollowUpAt?: string;
+}): Promise<Card> => {
+  // Fetch and validate the user
+  const user = await EntityHelper.findOneById(User, params.userId);
+  if (!user) {
+    throw new EntityNotFoundError();
+  }
+
+  // Fetch and validate the lane
+  const lane = await EntityHelper.findOneById(Lane, params.laneId);
+  if (!lane || !EntityHelper.isEntityOwnedBy(lane, user)) {
+    throw new EntityNotFoundError();
+  }
+
+  // Create the new card
+  const card = new NewCard(user, lane, params.name, params.amount);
+
+  // Set optional attributes
+  if (params.attributes) {
+    card.attributes = params.attributes;
+  }
+
+  if (params.closedAt && RequestParser.isValidDateTimeString(params.closedAt)) {
+    card.closedAt = RequestParser.toJsDate(params.closedAt);
+  }
+
+  if (params.nextFollowUpAt && RequestParser.isValidDateTimeString(params.nextFollowUpAt)) {
+    card.nextFollowUpAt = RequestParser.toJsDate(params.nextFollowUpAt);
+  }
+
+  // Save the card to the database
+  const latest = await EntityHelper.create(card, Card);
+
+  if (!latest) {
+    throw new Error('Failed to create card');
+  }
+
+  // Emit events
+  emitCardEvent(user, latest.toPlain());
+  emitLaneEvent(card.laneId, card.userId);
+  emitBoardEvent(lane.boardId, card.userId);
+
+  return latest;
+};
+
 export const CardController = {
   list,
   get,
   create,
   update,
+  createCardFromTool,
 };

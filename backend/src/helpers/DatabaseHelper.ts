@@ -37,10 +37,15 @@ function isInitialized(): boolean {
   return isConnected;
 }
 
+function getClient(): MongoClient {
+  return client;
+}
+
 export const DatabaseHelper = {
   connect,
   get,
   getCollection,
   close,
   isInitialized,
+  getClient,
 };

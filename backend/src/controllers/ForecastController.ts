@@ -14,6 +14,7 @@ import { TimeSpanExceedsLimitError } from '../errors/TimeSpanExceedsLimitError.j
 import { InvalidTimeSpanError } from '../errors/InvalidTimeSpanError.js';
 import { ObjectId } from 'mongodb';
 import { EntityHelper } from '../helpers/EntityHelper.js';
+import { executeForecastWorkflow } from '../workflows/ForecastWorkflow.js';
 
 const parseRange = (query: QueryString.ParsedQs) => {
   if (!RequestParser.isValidDateString(query.start)) {
@@ -69,9 +70,8 @@ const achieved = async (req: AuthenticatedRequest, res: Response, next: NextFunc
 
     const userId = req.query.userId ? new ObjectId(req.query.userId?.toString()) : undefined;
 
-    const statisticService = new ForecastService();
-
-    const forecast = await statisticService.getByLaneType(
+    // Use the dynamic workflow for forecast generation
+    const forecast = await executeForecastWorkflow(
       LaneType.ClosedWon,
       req.jwt.team._id,
       start,
@@ -91,9 +91,8 @@ const predicted = async (req: AuthenticatedRequest, res: Response, next: NextFun
 
     const userId = req.query.userId ? new ObjectId(req.query.userId?.toString()) : undefined;
 
-    const statisticService = new ForecastService();
-
-    const forecast = await statisticService.getByLaneType(
+    // Use the dynamic workflow for forecast generation
+    const forecast = await executeForecastWorkflow(
       LaneType.Normal,
       req.jwt.team._id,
       start,
