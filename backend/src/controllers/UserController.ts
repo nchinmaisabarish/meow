@@ -9,6 +9,7 @@ import { AuthenticatedRequest } from '../requests/AuthenticatedRequest.js';
 import { isValidName, isValidPassword } from './RegisterControllerValidator.js';
 import { EntityNotFoundError } from '../errors/EntityNotFoundError.js';
 import { validateAndFetchUser } from '../helpers/EntityFetchHelper.js';
+import { Team } from '../entities/Team.js';
 
 function parseUserStatus(value: unknown): UserStatus {
   switch (value) {
@@ -157,6 +158,39 @@ const password = async (req: AuthenticatedRequest, res: Response, next: NextFunc
   }
 };
 
+/**
+ * Adds a user to a team from tool input (for LangChain tool usage)
+ * This method can be called programmatically without an HTTP request
+ */
+const addUserToTeamFromTool = async (params: {
+  teamId: string;
+  name: string;
+}): Promise<User> => {
+  // Fetch and validate the team
+  const team = await EntityHelper.findOneById(Team, params.teamId);
+  if (!team) {
+    throw new EntityNotFoundError();
+  }
+
+  // Validate the name
+  await isValidName(params.name);
+
+  // Create the new user
+  const user = new NewUser(team, params.name, UserStatus.Invited);
+
+  // Generate invite code
+  user.invite = generateInviteCode(8);
+
+  // Save the user to the database
+  const created = await EntityHelper.create(user, User);
+
+  if (!created) {
+    throw new Error('Failed to create user');
+  }
+
+  return created;
+};
+
 export const UserController = {
   list,
   create,
@@ -164,4 +198,5 @@ export const UserController = {
   update,
   board,
   password,
+  addUserToTeamFromTool,
 };

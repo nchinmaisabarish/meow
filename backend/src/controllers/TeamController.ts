@@ -1,10 +1,11 @@
 import { Response, NextFunction } from 'express';
-import { CurrencyCode } from '../entities/Team.js';
+import { CurrencyCode, Team } from '../entities/Team.js';
 import { InvalidRequestBodyError } from '../errors/InvalidRequestBodyError.js';
 import { EntityHelper } from '../helpers/EntityHelper.js';
 import { AuthenticatedRequest } from '../requests/AuthenticatedRequest.js';
 import { validateAndFetchTeam } from '../helpers/EntityFetchHelper.js';
 import { InvalidRequestError } from '../errors/InvalidRequestError.js';
+import { EntityNotFoundError } from '../errors/EntityNotFoundError.js';
 
 const parseCurrencyCode = (value: string): CurrencyCode => {
   if (value in CurrencyCode) {
@@ -87,9 +88,33 @@ const get = async (req: AuthenticatedRequest, res: Response, next: NextFunction)
   }
 };
 
+/**
+ * Updates team settings from tool input (for LangChain tool usage)
+ * This method can be called programmatically without an HTTP request
+ */
+const updateTeamSettingsFromTool = async (params: {
+  teamId: string;
+  currency: string;
+}): Promise<Team> => {
+  // Fetch and validate the team
+  const team = await EntityHelper.findOneById(Team, params.teamId);
+  if (!team) {
+    throw new EntityNotFoundError();
+  }
+
+  // Update team currency
+  team.currency = parseCurrencyCode(params.currency);
+
+  // Save the updated team
+  const updated = await EntityHelper.update(team);
+
+  return updated;
+};
+
 export const TeamController = {
   update,
   allowTeamRegistration,
   updateIntegration,
   get,
+  updateTeamSettingsFromTool,
 };

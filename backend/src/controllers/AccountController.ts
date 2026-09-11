@@ -4,6 +4,8 @@ import { EntityHelper } from '../helpers/EntityHelper.js';
 import { AuthenticatedRequest } from '../requests/AuthenticatedRequest.js';
 import { EventHelper } from '../helpers/EventHelper.js';
 import { validateAndFetchAccount } from '../helpers/EntityFetchHelper.js';
+import { Team } from '../entities/Team.js';
+import { EntityNotFoundError } from '../errors/EntityNotFoundError.js';
 
 const create = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -70,9 +72,45 @@ const fetch = async (req: AuthenticatedRequest, res: Response, next: NextFunctio
   }
 };
 
+/**
+ * Creates an account from tool input (for LangChain tool usage)
+ * This method can be called programmatically without an HTTP request
+ */
+const createAccountFromTool = async (params: {
+  teamId: string;
+  name: string;
+  attributes?: { [key: string]: string | number | null };
+}): Promise<Account> => {
+  // Fetch and validate the team
+  const team = await EntityHelper.findOneById(Team, params.teamId);
+  if (!team) {
+    throw new EntityNotFoundError();
+  }
+
+  // Create the new account
+  const account = new NewAccount(team, params.name);
+
+  // Set optional attributes
+  if (params.attributes) {
+    account.attributes = params.attributes;
+  }
+
+  // Save the account to the database
+  const latest = await EntityHelper.create(account, Account);
+
+  if (!latest) {
+    throw new Error('Failed to create account');
+  }
+
+  // Note: Events are not emitted for tool-based operations as they lack user context
+
+  return latest;
+};
+
 export const AccountController = {
   update,
   create,
   list,
   fetch,
+  createAccountFromTool,
 };
