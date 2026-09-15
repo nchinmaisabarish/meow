@@ -81,6 +81,8 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { NaturalLanguageController } from './controllers/NaturalLanguageController.js';
+import { ToolRegistry } from './tools/ToolRegistry.js';
 
 /* spinning up express */
 export const app = express();
@@ -121,6 +123,11 @@ try {
   strategy.register('account', AccountEventListener.onAccountUpdate);
 
   EventHelper.set(strategy);
+
+  // ToolRegistry is available for creating context-aware LangChain tools
+  // Usage: const registry = ToolRegistry.create(user, team);
+  // This provides structured tool definitions for agent-based workflows
+  log.info('ToolRegistry available for LangChain tool creation');
 
   const card = express.Router();
 
@@ -329,6 +336,16 @@ try {
   activity.route('/').get(ActivityController.list);
 
   app.use('/api/activities', activity);
+
+  const query = express.Router();
+
+  query.use(express.json({ limit: '5kb' }));
+
+  query.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  query.route('/').post(rejectIfContentTypeIsNot('application/json'), NaturalLanguageController.query);
+
+  app.use('/api/query', query);
 
   const unprotected = express.Router();
 
