@@ -1,0 +1,106 @@
+{
+  "intents": [
+    {
+      "name": "list_cards",
+      "description": "List all cards/deals/opportunities in the pipeline",
+      "toolName": "list_cards",
+      "keywords": ["cards", "deals", "opportunities", "list", "show", "view", "all"],
+      "examples": [
+        "Show me all cards",
+        "List my deals",
+        "What opportunities do I have?",
+        "Show all active cards"
+      ]
+    },
+    {
+      "name": "get_card",
+      "description": "Get details about a specific card by ID",
+      "toolName": "get_card",
+      "keywords": ["card", "deal", "opportunity", "details", "show", "get", "view"],
+      "examples": [
+        "Show me card 123",
+        "Get details for deal abc",
+        "What's the status of card xyz?"
+      ]
+    },
+    {
+      "name": "move_card_to_lane",
+      "description": "Move a card to a different lane/stage in the pipeline",
+      "toolName": "move_card_to_lane",
+      "keywords": ["move", "card", "lane", "stage", "transfer", "change"],
+      "examples": [
+        "Move card 123 to lane 456",
+        "Change deal abc to stage xyz",
+        "Transfer card to next stage"
+      ]
+    },
+    {
+      "name": "list_accounts",
+      "description": "List all accounts/companies",
+      "toolName": "list_accounts",
+      "keywords": ["accounts", "companies", "clients", "customers", "list", "show"],
+      "examples": [
+        "Show me all accounts",
+        "List companies",
+        "What clients do we have?"
+      ]
+    },
+    {
+      "name": "list_lanes",
+      "description": "List all lanes/stages in the pipeline",
+      "toolName": "list_lanes",
+      "keywords": ["lanes", "stages", "pipeline", "list", "show"],
+      "examples": [
+        "Show me all lanes",
+        "List pipeline stages",
+        "What stages are there?"
+      ]
+    },
+    {
+      "name": "list_users",
+      "description": "List all users in the team",
+      "toolName": "list_users",
+      "keywords": ["users", "team", "members", "people", "list", "show"],
+      "examples": [
+        "Show me all users",
+        "List team members",
+        "Who's on the team?"
+      ]
+    },
+    {
+      "name": "get_predicted_forecast",
+      "description": "Get the predicted forecast for the current period",
+      "toolName": "get_predicted_forecast",
+      "keywords": ["forecast", "predicted", "prediction", "pipeline", "revenue", "expected"],
+      "examples": [
+        "What's the forecast?",
+        "Show predicted revenue",
+        "What's our pipeline forecast?"
+      ]
+    },
+    {
+      "name": "get_achieved_forecast",
+      "description": "Get the achieved/closed won forecast for the current period",
+      "toolName": "get_achieved_forecast",
+      "keywords": ["achieved", "closed", "won", "actual", "revenue", "sales"],
+      "examples": [
+        "What have we closed?",
+        "Show achieved revenue",
+        "What deals did we win?"
+      ]
+    },
+    {
+      "name": "list_activities",
+      "description": "List recent activities and events",
+      "toolName": "list_activities",
+      "keywords": ["activities", "events", "history", "log", "recent", "list"],
+      "examples": [
+        "Show recent activities",
+        "What happened recently?",
+        "List activity log"
+      ]
+    }
+  ],
+  "defaultIntent": "unknown",
+  "confidenceThreshold": 0.5
+}

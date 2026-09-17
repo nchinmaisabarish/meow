@@ -10,6 +10,7 @@ import { DateTime } from 'luxon';
 import { ApplicationError } from '../errors/ApplicationError.js';
 import { StatusCodes } from 'http-status-codes';
 import { DatabaseHelper } from './DatabaseHelper.js';
+import { IntentWorkflow } from '../workflows/IntentWorkflow.js';
 
 class UnknownIntentError extends ApplicationError {
   constructor(intent: string) {
@@ -17,10 +18,46 @@ class UnknownIntentError extends ApplicationError {
   }
 }
 
+class IntentRoutingError extends ApplicationError {
+  constructor(description?: string) {
+    super('IntentRoutingError', StatusCodes.BAD_REQUEST, description);
+  }
+}
+
 /**
- * Routes parsed natural language intents to appropriate controller methods
+ * Routes parsed natural language intents to appropriate controller methods.
+ * This class now uses the IntentWorkflow system for semantic intent dispatch
+ * instead of hardcoded switch statements, while maintaining backward compatibility
+ * for direct intent routing.
  */
 export class IntentRouter {
+  /**
+   * Route an intent using the workflow system
+   * This is the preferred method for intent routing
+   */
+  static async routeWithWorkflow(
+    userRequest: string,
+    req: AuthenticatedRequest
+  ): Promise<unknown> {
+    const workflow = new IntentWorkflow();
+    const result = await workflow.invoke({
+      userRequest,
+      user: req.jwt.user,
+      team: req.jwt.team,
+    });
+
+    if (!result.success) {
+      throw new IntentRoutingError(result.error || 'Failed to route intent');
+    }
+
+    return result.result;
+  }
+
+  /**
+   * Legacy method for direct intent routing
+   * Maintained for backward compatibility
+   * @deprecated Use routeWithWorkflow instead for semantic intent dispatch
+   */
   static async route(
     intent: string,
     parameters: Record<string, unknown>,
