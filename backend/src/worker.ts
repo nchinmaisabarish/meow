@@ -83,6 +83,8 @@ import { CardForecastEventListener } from './events/CardForecastEventListener.js
 import { ActivityController } from './controllers/ActivityController.js';
 import { NaturalLanguageController } from './controllers/NaturalLanguageController.js';
 import { QueryRequestSchema } from './middlewares/schema-validation/QueryRequestSchema.js';
+import { ToolRegistry } from './helpers/ToolRegistry.js';
+import { AuthenticatedRequest } from './requests/AuthenticatedRequest.js';
 
 /* spinning up express */
 export const app = express();
@@ -347,6 +349,29 @@ try {
     );
 
   app.use('/api/query', query);
+
+  const tools = express.Router();
+
+  tools.use(express.json({ limit: '5kb' }));
+
+  tools.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  tools.route('/').get((req: AuthenticatedRequest, res, next) => {
+    try {
+      const registry = new ToolRegistry(req.jwt.user, req.jwt.team);
+      const toolSchemas = registry.getToolSchemas();
+      
+      return res.json({
+        success: true,
+        count: toolSchemas.length,
+        tools: toolSchemas,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.use('/api/tools', tools);
 
   const unprotected = express.Router();
 
