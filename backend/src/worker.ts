@@ -81,6 +81,10 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { NaturalLanguageController } from './controllers/NaturalLanguageController.js';
+import { QueryRequestSchema } from './middlewares/schema-validation/QueryRequestSchema.js';
+import { ToolRegistry } from './helpers/ToolRegistry.js';
+import { AuthenticatedRequest } from './requests/AuthenticatedRequest.js';
 
 /* spinning up express */
 export const app = express();
@@ -329,6 +333,45 @@ try {
   activity.route('/').get(ActivityController.list);
 
   app.use('/api/activities', activity);
+
+  const query = express.Router();
+
+  query.use(express.json({ limit: '5kb' }));
+
+  query.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  query
+    .route('/')
+    .post(
+      rejectIfContentTypeIsNot('application/json'),
+      validateAgainst(QueryRequestSchema),
+      NaturalLanguageController.query
+    );
+
+  app.use('/api/query', query);
+
+  const tools = express.Router();
+
+  tools.use(express.json({ limit: '5kb' }));
+
+  tools.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  tools.route('/').get((req: AuthenticatedRequest, res, next) => {
+    try {
+      const registry = new ToolRegistry(req.jwt.user, req.jwt.team);
+      const toolSchemas = registry.getToolSchemas();
+      
+      return res.json({
+        success: true,
+        count: toolSchemas.length,
+        tools: toolSchemas,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.use('/api/tools', tools);
 
   const unprotected = express.Router();
 
