@@ -14,6 +14,7 @@ import { TimeSpanExceedsLimitError } from '../errors/TimeSpanExceedsLimitError.j
 import { InvalidTimeSpanError } from '../errors/InvalidTimeSpanError.js';
 import { ObjectId } from 'mongodb';
 import { EntityHelper } from '../helpers/EntityHelper.js';
+import { getWorkflowExecutor } from '../services/WorkflowExecutor.js';
 
 const parseRange = (query: QueryString.ParsedQs) => {
   if (!RequestParser.isValidDateString(query.start)) {
@@ -69,17 +70,22 @@ const achieved = async (req: AuthenticatedRequest, res: Response, next: NextFunc
 
     const userId = req.query.userId ? new ObjectId(req.query.userId?.toString()) : undefined;
 
-    const statisticService = new ForecastService();
+    // Use the workflow executor to generate forecast
+    const workflowExecutor = getWorkflowExecutor();
 
-    const forecast = await statisticService.getByLaneType(
-      LaneType.ClosedWon,
-      req.jwt.team._id,
+    const result = await workflowExecutor.executeForecastGeneration({
+      laneType: LaneType.ClosedWon,
+      teamId: req.jwt.team._id,
       start,
       end,
-      userId
-    );
+      userId,
+    });
 
-    return res.json(forecast);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate forecast');
+    }
+
+    return res.json(result.prediction);
   } catch (error) {
     return next(error);
   }
@@ -91,17 +97,22 @@ const predicted = async (req: AuthenticatedRequest, res: Response, next: NextFun
 
     const userId = req.query.userId ? new ObjectId(req.query.userId?.toString()) : undefined;
 
-    const statisticService = new ForecastService();
+    // Use the workflow executor to generate forecast
+    const workflowExecutor = getWorkflowExecutor();
 
-    const forecast = await statisticService.getByLaneType(
-      LaneType.Normal,
-      req.jwt.team._id,
+    const result = await workflowExecutor.executeForecastGeneration({
+      laneType: LaneType.Normal,
+      teamId: req.jwt.team._id,
       start,
       end,
-      userId
-    );
+      userId,
+    });
 
-    return res.json(forecast);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate forecast');
+    }
+
+    return res.json(result.prediction);
   } catch (error) {
     return next(error);
   }
