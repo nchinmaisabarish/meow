@@ -81,6 +81,12 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { NaturalLanguageController } from './controllers/NaturalLanguageController.js';
+import { NaturalLanguageQueryRequestSchema } from './middlewares/schema-validation/NaturalLanguageQueryRequestSchema.js';
+import { ToolRegistry } from './tools/ToolRegistry.js';
+import { AgentController } from './controllers/AgentController.js';
+import { AgentRequestSchema } from './middlewares/schema-validation/AgentRequestSchema.js';
+import { ConversationController } from './controllers/ConversationController.js';
 
 /* spinning up express */
 export const app = express();
@@ -329,6 +335,74 @@ try {
   activity.route('/').get(ActivityController.list);
 
   app.use('/api/activities', activity);
+
+  const query = express.Router();
+
+  query.use(express.json({ limit: '5kb' }));
+
+  query.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  query
+    .route('/')
+    .post(
+      rejectIfContentTypeIsNot('application/json'),
+      validateAgainst(NaturalLanguageQueryRequestSchema),
+      NaturalLanguageController.query
+    );
+
+  app.use('/api/query', query);
+
+  const tools = express.Router();
+
+  tools.use(express.json({ limit: '5kb' }));
+
+  tools.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  tools.route('/').get((req, res) => {
+    try {
+      const toolSchemas = ToolRegistry.getToolSchemas();
+      return res.json({
+        success: true,
+        count: toolSchemas.length,
+        tools: toolSchemas,
+      });
+    } catch (error: unknown) {
+      log.error(error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve tools',
+      });
+    }
+  });
+
+  app.use('/api/tools', tools);
+
+  const agent = express.Router();
+
+  agent.use(express.json({ limit: '5kb' }));
+
+  agent.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  agent
+    .route('/')
+    .post(
+      rejectIfContentTypeIsNot('application/json'),
+      validateAgainst(AgentRequestSchema),
+      AgentController.execute
+    );
+
+  app.use('/api/agent', agent);
+
+  const conversation = express.Router();
+
+  conversation.use(express.json({ limit: '5kb' }));
+
+  conversation.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  conversation.route('/').get(ConversationController.list);
+  conversation.route('/:threadId').get(ConversationController.get);
+
+  app.use('/api/conversations', conversation);
 
   const unprotected = express.Router();
 
