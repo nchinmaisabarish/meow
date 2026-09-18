@@ -84,6 +84,8 @@ import { ActivityController } from './controllers/ActivityController.js';
 import { NaturalLanguageController } from './controllers/NaturalLanguageController.js';
 import { NaturalLanguageQueryRequestSchema } from './middlewares/schema-validation/NaturalLanguageQueryRequestSchema.js';
 import { ToolRegistry } from './tools/ToolRegistry.js';
+import { AgentController } from './controllers/AgentController.js';
+import { AgentRequestSchema } from './middlewares/schema-validation/AgentRequestSchema.js';
 
 /* spinning up express */
 export const app = express();
@@ -373,6 +375,22 @@ try {
   });
 
   app.use('/api/tools', tools);
+
+  const agent = express.Router();
+
+  agent.use(express.json({ limit: '5kb' }));
+
+  agent.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  agent
+    .route('/')
+    .post(
+      rejectIfContentTypeIsNot('application/json'),
+      validateAgainst(AgentRequestSchema),
+      AgentController.execute
+    );
+
+  app.use('/api/agent', agent);
 
   const unprotected = express.Router();
 
