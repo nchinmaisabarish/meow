@@ -83,6 +83,7 @@ import { CardForecastEventListener } from './events/CardForecastEventListener.js
 import { ActivityController } from './controllers/ActivityController.js';
 import { NaturalLanguageController } from './controllers/NaturalLanguageController.js';
 import { NaturalLanguageQueryRequestSchema } from './middlewares/schema-validation/NaturalLanguageQueryRequestSchema.js';
+import { ToolRegistry } from './tools/ToolRegistry.js';
 
 /* spinning up express */
 export const app = express();
@@ -347,6 +348,31 @@ try {
     );
 
   app.use('/api/query', query);
+
+  const tools = express.Router();
+
+  tools.use(express.json({ limit: '5kb' }));
+
+  tools.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  tools.route('/').get((req, res) => {
+    try {
+      const toolSchemas = ToolRegistry.getToolSchemas();
+      return res.json({
+        success: true,
+        count: toolSchemas.length,
+        tools: toolSchemas,
+      });
+    } catch (error: unknown) {
+      log.error(error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve tools',
+      });
+    }
+  });
+
+  app.use('/api/tools', tools);
 
   const unprotected = express.Router();
 
