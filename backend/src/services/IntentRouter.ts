@@ -10,6 +10,7 @@ import { InvalidRequestError } from '../errors/InvalidRequestError.js';
 import { log } from '../worker.js';
 import { User } from '../entities/User.js';
 import { Team } from '../entities/Team.js';
+import { agentMemory, PostgresSaver } from './AgentMemory.js';
 
 // Get the directory name for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -73,6 +74,7 @@ export interface AgentExecutionInput {
   input: string;
   user: User;
   team: Team;
+  threadId?: string; // Optional thread ID for conversation continuity
 }
 
 /**
@@ -80,6 +82,7 @@ export interface AgentExecutionInput {
  */
 export interface AgentExecutionResult {
   output: string;
+  threadId?: string; // Thread ID for tracking conversation
   intermediateSteps?: Array<{
     action: string;
     observation: string;
@@ -89,9 +92,15 @@ export interface AgentExecutionResult {
 /**
  * IntentRouter service that uses a LangChain agent executor to parse
  * user requests and dynamically invoke the appropriate tools.
+ * Integrates with AgentMemory for conversation state persistence.
  */
 export class IntentRouter {
   private agentExecutor: AgentExecutor | null = null;
+  private checkpointer: PostgresSaver;
+
+  constructor(checkpointer?: PostgresSaver) {
+    this.checkpointer = checkpointer || agentMemory.getCheckpointer();
+  }
 
   /**
    * Initialize the agent executor with tools and LLM
@@ -114,6 +123,8 @@ export class IntentRouter {
       });
 
       // Create the executor
+      // Note: AgentExecutor in this version doesn't directly support checkpointers
+      // Checkpointing is handled manually in the execute method
       this.agentExecutor = new AgentExecutor({
         agent,
         tools,
@@ -131,11 +142,22 @@ export class IntentRouter {
   }
 
   /**
-   * Execute a user request through the agent
+   * Get the checkpointer instance
+   */
+  getCheckpointer(): PostgresSaver {
+    return this.checkpointer;
+  }
+
+  /**
+   * Execute a user request through the agent with conversation checkpointing
    */
   async execute(executionInput: AgentExecutionInput): Promise<AgentExecutionResult> {
     try {
       const executor = await this.initializeAgent();
+
+      // Create or use existing thread ID for conversation continuity
+      const threadId = executionInput.threadId || 
+        agentMemory.createThreadId(executionInput.user._id!, executionInput.team._id!);
 
       // Prepare the input with user and team context
       const input = {
@@ -147,16 +169,62 @@ export class IntentRouter {
         currency: executionInput.team.currency,
       };
 
-      log.info('Executing agent with input:', { input: executionInput.input });
+      log.info('Executing agent with input:', { 
+        input: executionInput.input, 
+        threadId 
+      });
+
+      // Load previous checkpoint if available (for conversation context)
+      // Note: In this version, we save checkpoints but don't restore state to AgentExecutor
+      // This provides an audit trail and enables future conversation resumption
+      const previousCheckpoint = await this.checkpointer.getTuple({
+        configurable: { thread_id: threadId }
+      });
+
+      if (previousCheckpoint) {
+        log.debug('Found previous checkpoint for thread:', { threadId });
+      }
 
       // Execute the agent
       const result = await executor.invoke(input);
 
-      log.info('Agent execution completed:', { output: result.output });
+      log.info('Agent execution completed:', { output: result.output, threadId });
+
+      // Save checkpoint after execution for conversation tracking
+      // This creates an audit trail of agent interactions
+      try {
+        await this.saveExecutionCheckpoint(
+          threadId,
+          executionInput,
+          result,
+          previousCheckpoint?.config.configurable?.checkpoint_id
+        );
+      } catch (checkpointError: unknown) {
+        // Log but don't fail the request if checkpoint save fails
+        log.error('Failed to save checkpoint:', checkpointError);
+      }
+
+      // Update session tracking
+      try {
+        await agentMemory.saveSession({
+          threadId,
+          userId: executionInput.user._id!.toString(),
+          teamId: executionInput.team._id!.toString(),
+          lastActivityAt: new Date(),
+          createdAt: new Date(),
+          metadata: {
+            lastInput: executionInput.input,
+            lastOutput: result.output,
+          },
+        });
+      } catch (sessionError: unknown) {
+        log.error('Failed to save session:', sessionError);
+      }
 
       // Format the result
       const formattedResult: AgentExecutionResult = {
         output: result.output,
+        threadId,
       };
 
       // Include intermediate steps if available
@@ -188,6 +256,51 @@ export class IntentRouter {
   }
 
   /**
+   * Save execution checkpoint for audit trail and future resumption
+   */
+  private async saveExecutionCheckpoint(
+    threadId: string,
+    input: AgentExecutionInput,
+    result: any,
+    parentCheckpointId?: string
+  ): Promise<void> {
+    const checkpoint = {
+      v: 1,
+      id: `checkpoint_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      ts: new Date().toISOString(),
+      channel_values: {
+        input: input.input,
+        output: result.output,
+        userId: input.user._id!.toString(),
+        teamId: input.team._id!.toString(),
+      },
+      channel_versions: {},
+      versions_seen: {},
+      pending_sends: [],
+    };
+
+    const metadata = {
+      source: 'loop' as const,
+      step: 0,
+      writes: {
+        input: input.input,
+        output: result.output,
+      },
+    };
+
+    await this.checkpointer.put(
+      {
+        configurable: {
+          thread_id: threadId,
+          checkpoint_id: parentCheckpointId,
+        },
+      },
+      checkpoint,
+      metadata
+    );
+  }
+
+  /**
    * Reset the agent executor (useful for testing or configuration changes)
    */
   reset(): void {
@@ -196,5 +309,5 @@ export class IntentRouter {
   }
 }
 
-// Export a singleton instance
+// Export a singleton instance with checkpointing enabled
 export const intentRouter = new IntentRouter();
