@@ -14,6 +14,7 @@ import {
   validateAndFetchLane,
   validateAndFetchUser,
 } from '../helpers/EntityFetchHelper.js';
+import { getWorkflowExecutor } from '../services/WorkflowExecutor.js';
 
 const extractDateLimitFromRequest = (req: AuthenticatedRequest): DateTime | undefined => {
   const maxDaysAgo = req.query['max-days-ago']
@@ -96,27 +97,38 @@ const create = async (req: AuthenticatedRequest, res: Response, next: NextFuncti
       throw new EntityNotFoundError();
     }
 
-    const card = new NewCard(req.jwt.user, lane, body.name, parseInt(body.amount));
-
-    if (body.attributes) {
-      card.attributes = body.attributes;
-    }
-
+    // Parse optional date fields
+    let closedAt: Date | undefined = undefined;
     if (body.closedAt && RequestParser.isValidDateTimeString(body.closedAt)) {
-      card.closedAt = RequestParser.toJsDate(body.closedAt);
+      closedAt = RequestParser.toJsDate(body.closedAt);
     }
 
+    let nextFollowUpAt: Date | undefined = undefined;
     if (body.nextFollowUpAt && RequestParser.isValidDateTimeString(body.nextFollowUpAt)) {
-      card.nextFollowUpAt = RequestParser.toJsDate(body.nextFollowUpAt);
+      nextFollowUpAt = RequestParser.toJsDate(body.nextFollowUpAt);
     }
 
-    const latest = await EntityHelper.create(card, Card);
+    // Execute card creation through workflow
+    const workflowExecutor = getWorkflowExecutor();
+    const result = await workflowExecutor.executeCardCreation({
+      user: req.jwt.user,
+      lane: lane,
+      name: body.name,
+      amount: parseInt(body.amount),
+      attributes: body.attributes,
+      closedAt: closedAt,
+      nextFollowUpAt: nextFollowUpAt,
+    });
 
-    emitCardEvent(req.jwt.user, latest!.toPlain());
-    emitLaneEvent(card.laneId, card.userId);
-    emitBoardEvent(lane.boardId, card.userId);
+    if (!result.success || !result.card) {
+      // If workflow failed, throw an appropriate error
+      if (result.validationErrors && result.validationErrors.length > 0) {
+        throw new InvalidCardPropertyError(result.validationErrors.join(', '));
+      }
+      throw new Error(result.error || 'Failed to create card through workflow');
+    }
 
-    return res.status(201).json(latest);
+    return res.status(201).json(result.card);
   } catch (error) {
     return next(error);
   }
