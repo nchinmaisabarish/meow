@@ -86,6 +86,7 @@ import { NaturalLanguageQueryRequestSchema } from './middlewares/schema-validati
 import { ToolRegistry } from './tools/ToolRegistry.js';
 import { AgentController } from './controllers/AgentController.js';
 import { AgentRequestSchema } from './middlewares/schema-validation/AgentRequestSchema.js';
+import { ConversationController } from './controllers/ConversationController.js';
 
 /* spinning up express */
 export const app = express();
@@ -391,6 +392,17 @@ try {
     );
 
   app.use('/api/agent', agent);
+
+  const conversation = express.Router();
+
+  conversation.use(express.json({ limit: '5kb' }));
+
+  conversation.use(verifyJwt, addEntityToHeader, setHeaders, isDatabaseConnectionEstablished);
+
+  conversation.route('/').get(ConversationController.list);
+  conversation.route('/:threadId').get(ConversationController.get);
+
+  app.use('/api/conversations', conversation);
 
   const unprotected = express.Router();
 
