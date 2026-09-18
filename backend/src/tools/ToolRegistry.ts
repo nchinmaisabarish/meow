@@ -6,6 +6,17 @@ import {
   getCardTool,
   listCardsTool,
 } from './CardTools.js';
+import {
+  createLaneTool,
+  updateLaneTool,
+  listLanesTool,
+  getLaneStatisticsTool,
+} from './LaneTools.js';
+import {
+  getTeamTool,
+  updateTeamTool,
+  updateTeamIntegrationTool,
+} from './TeamTools.js';
 
 /**
  * Registry of all available tools in the application.
@@ -19,6 +30,13 @@ export class ToolRegistry {
     deleteCardTool,
     getCardTool,
     listCardsTool,
+    createLaneTool,
+    updateLaneTool,
+    listLanesTool,
+    getLaneStatisticsTool,
+    getTeamTool,
+    updateTeamTool,
+    updateTeamIntegrationTool,
   ];
 
   /**
@@ -78,4 +96,17 @@ export const cardTools = [
   deleteCardTool,
   getCardTool,
   listCardsTool,
+];
+
+export const laneTools = [
+  createLaneTool,
+  updateLaneTool,
+  listLanesTool,
+  getLaneStatisticsTool,
+];
+
+export const teamTools = [
+  getTeamTool,
+  updateTeamTool,
+  updateTeamIntegrationTool,
 ];
