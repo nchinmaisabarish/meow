@@ -81,6 +81,64 @@ import JobDailyScheduler from './job-daily-scheduler.js';
 import { BoardEventListener } from './events/BoardEventListener.js';
 import { CardForecastEventListener } from './events/CardForecastEventListener.js';
 import { ActivityController } from './controllers/ActivityController.js';
+import { intentMappings, validateIntentMappings } from './intent/intentMappings.js';
+
+export class IntentRegistry {
+  private static instance: IntentRegistry;
+  private mappings: Map<string, any>;
+
+  private constructor() {
+    this.mappings = new Map();
+  }
+
+  public static getInstance(): IntentRegistry {
+    if (!IntentRegistry.instance) {
+      IntentRegistry.instance = new IntentRegistry();
+    }
+    return IntentRegistry.instance;
+  }
+
+  public register(intent: string, mapping: any): void {
+    this.mappings.set(intent, mapping);
+  }
+
+  public resolve(intent: string): any | undefined {
+    return this.mappings.get(intent);
+  }
+
+  public getAll(): Map<string, any> {
+    return this.mappings;
+  }
+
+  public clear(): void {
+    this.mappings.clear();
+  }
+}
+
+function initializeIntentRegistry(): void {
+  log.info('Initializing Intent Registry...');
+
+  const validation = validateIntentMappings();
+
+  if (!validation.valid) {
+    log.error('Intent mapping validation failed:');
+    validation.errors.forEach((error) => {
+      log.error(`  - ${error}`);
+    });
+    throw new Error('Intent mapping validation failed. See logs for details.');
+  }
+
+  const registry = IntentRegistry.getInstance();
+
+  intentMappings.forEach((mapping) => {
+    registry.register(mapping.intent, mapping);
+    log.info(
+      `Registered intent: ${mapping.intent} -> ${mapping.controller.name}.${mapping.method}`
+    );
+  });
+
+  log.info(`Intent Registry initialized with ${intentMappings.length} mappings`);
+}
 
 /* spinning up express */
 export const app = express();
@@ -110,6 +168,8 @@ try {
   await DatabaseHelper.connect(process.env.MONGODB_URI!);
 
   log.info('database connection established');
+
+  initializeIntentRegistry();
 
   const strategy = new NodeEventStrategy();
 
